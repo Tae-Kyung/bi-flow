@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(head:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.kakaoi.ai)",
+      "Bash(find:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:www.saastr.com)",
+      "WebFetch(domain:compileinfy.com)",
+      "WebFetch(domain:blog.logrocket.com)",
+      "WebFetch(domain:www.econify.com)",
+      "WebFetch(domain:www.softr.io)",
+      "Bash(npm run build:*)",
+      "Bash(cd \"C:/Users/misoh/OneDrive/Desktop/workspace\" && npx create-next-app@latest bi-flow-temp --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack --no-experimental-app 2>&1 << 'EOF'\nNo\nEOF)",
+      "Bash(rm:*)",
+      "Bash(cp:*)",
+      "Bash(tail:*)",
+      "Bash(cd \"C:/Users/misoh/OneDrive/Desktop/workspace/bi-flow\" && npx shadcn@latest add button input card table dialog form toast label select textarea badge dropdown-menu separator sheet avatar tabs tooltip --force 2>&1)",
+      "Bash(cd \"C:/Users/misoh/OneDrive/Desktop/workspace/bi-flow\" && npx shadcn@latest add -y button input card table dialog form toast label select textarea badge dropdown-menu separator sheet avatar tabs tooltip 2>&1)",
+      "Bash(cd \"C:/Users/misoh/OneDrive/Desktop/workspace/bi-flow\" && npx shadcn@latest add -y button input card table dialog form sonner label select textarea badge dropdown-menu separator sheet avatar tabs tooltip 2>&1)",
+      "Bash(cd \"C:/Users/misoh/OneDrive/Desktop/workspace/bi-flow\" && npm install @supabase/supabase-js @supabase/ssr 2>&1)",
+      "Bash(cd:*)",
+      "Bash(cd \"C:/Users/misoh/OneDrive/Desktop/workspace/bi-flow\" && npm install lucide-react 2>&1)",
+      "Bash(cd /c/Users/misoh/OneDrive/Desktop/workspace/bi-flow && npx next build 2>&1)",
+      "Bash(ls:*)",
+      "Bash(cd /c/Users/misoh/OneDrive/Desktop/workspace/bi-flow && SUPABASE_ACCESS_TOKEN=sbp_869b56dffdacc26fd6281f02843a52e6b156e7bc npx supabase db push 2>&1)",
+      "Bash(cd /c/Users/misoh/OneDrive/Desktop/workspace/bi-flow && SUPABASE_ACCESS_TOKEN=sbp_869b56dffdacc26fd6281f02843a52e6b156e7bc npx supabase db execute --sql \"\nSELECT table_name FROM information_schema.tables \nWHERE table_schema = 'public' \nORDER BY table_name;\n\" 2>&1)",
+      "Bash(curl:*)",
+      "Bash(taskkill:*)"
+    ]
+  }
+}
