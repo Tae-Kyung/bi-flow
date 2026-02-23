@@ -30,7 +30,10 @@
       "Bash(cd /c/Users/misoh/OneDrive/Desktop/workspace/bi-flow && SUPABASE_ACCESS_TOKEN=sbp_869b56dffdacc26fd6281f02843a52e6b156e7bc npx supabase db push 2>&1)",
       "Bash(cd /c/Users/misoh/OneDrive/Desktop/workspace/bi-flow && SUPABASE_ACCESS_TOKEN=sbp_869b56dffdacc26fd6281f02843a52e6b156e7bc npx supabase db execute --sql \"\nSELECT table_name FROM information_schema.tables \nWHERE table_schema = 'public' \nORDER BY table_name;\n\" 2>&1)",
       "Bash(curl:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(cd /c/Users/misoh/OneDrive/Desktop/workspace/bi-flow && rm -rf .next && npx next dev 2>&1)",
+      "Bash(cat:*)",
+      "Bash(python3:*)"
     ]
   }
 }
