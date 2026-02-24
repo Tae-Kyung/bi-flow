@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -16,14 +23,33 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+interface Organization {
+  id: string;
+  name: string;
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [orgId, setOrgId] = useState("");
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchOrganizations() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("organizations")
+        .select("id, name")
+        .order("name");
+      if (data) setOrganizations(data);
+    }
+    fetchOrganizations();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,12 +62,18 @@ export default function SignupPage() {
       return;
     }
 
+    if (!orgId) {
+      setError("소속 기관을 선택해주세요.");
+      setLoading(false);
+      return;
+    }
+
     const supabase = createClient();
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { name },
+        data: { name, role: "org_admin", org_id: orgId },
       },
     });
 
@@ -118,6 +150,21 @@ export default function SignupPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="org">소속 기관</Label>
+            <Select value={orgId} onValueChange={setOrgId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="기관을 선택하세요" />
+              </SelectTrigger>
+              <SelectContent>
+                {organizations.map((org) => (
+                  <SelectItem key={org.id} value={org.id}>
+                    {org.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-2">

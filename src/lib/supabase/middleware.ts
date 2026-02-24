@@ -29,12 +29,6 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  console.log("[middleware]", request.nextUrl.pathname, {
-    hasUser: !!user,
-    email: user?.email,
-    cookies: request.cookies.getAll().map(c => c.name).filter(n => n.startsWith("sb-")),
-  });
-
   const isAuthPage =
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/signup");
