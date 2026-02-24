@@ -78,6 +78,8 @@ export interface Space {
   organization?: Organization;
 }
 
+export type CorporateType = "corporation" | "individual" | "pre_startup";
+
 export interface Company {
   id: string;
   org_id: string;
@@ -88,6 +90,20 @@ export interface Company {
   email: string | null;
   address: string | null;
   status: CompanyStatus;
+  // 확장 필드 (Datafield.md 표준)
+  corporate_type: string | null;
+  founding_date: string | null;
+  business_description: string | null;
+  main_products: string | null;
+  website: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  office_phone: string | null;
+  fax: string | null;
+  certification_expiry: string | null;
+  notes: string | null;
+  // 졸업 관련
   graduation_notes: string | null;
   graduated_at: string | null;
   created_at: string;

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import {
   TEMPLATE_COLUMNS,
+  TEMPLATE_SAMPLE_DATA,
   mapHeaders,
   getMissingColumns,
   validateRow,
@@ -43,17 +44,26 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const DB_TO_KOREAN: Record<string, string> = {
   name: "기업명",
-  biz_number: "사업자등록번호",
-  representative: "대표자명",
+  biz_number: "사업자번호",
+  corporate_type: "구분",
+  representative: "대표자",
+  founding_date: "설립일",
+  business_description: "사업내용",
+  main_products: "주생산품",
   phone: "연락처",
   email: "이메일",
   address: "주소",
 };
 
+// Preview table에 표시할 주요 컬럼
 const DATA_COLUMNS = [
   "name",
   "biz_number",
+  "corporate_type",
   "representative",
+  "founding_date",
+  "business_description",
+  "main_products",
   "phone",
   "email",
   "address",
@@ -86,13 +96,16 @@ export function BulkUploadClient({
   );
   const selectedRows = rows.filter((r) => r.isSelected);
 
-  // Download template Excel
+  // Download template Excel with sample data
   const handleDownloadTemplate = useCallback(() => {
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_COLUMNS]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      TEMPLATE_COLUMNS,
+      ...TEMPLATE_SAMPLE_DATA,
+    ]);
     // Set column widths
     ws["!cols"] = TEMPLATE_COLUMNS.map((col) => ({
-      wch: col === "주소" ? 30 : col === "이메일" ? 25 : 18,
+      wch: col === "주소" ? 30 : col === "주요사업내용" ? 25 : col === "이메일" || col === "담당자 이메일" || col === "홈페이지" ? 28 : 16,
     }));
     XLSX.utils.book_append_sheet(wb, ws, "기업목록");
     XLSX.writeFile(wb, "기업_일괄등록_템플릿.xlsx");

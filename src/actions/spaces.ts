@@ -10,7 +10,7 @@ export async function getSpaces(orgId?: string) {
 
   let query = supabase
     .from("spaces")
-    .select("*, organization:organizations(name)")
+    .select("*, organization:organizations(name), contracts:contracts(id, company:companies(id, name), status)")
     .order("created_at", { ascending: true });
 
   const filterOrgId = orgId || (profile.role !== "super_admin" ? profile.org_id : null);
@@ -18,7 +18,16 @@ export async function getSpaces(orgId?: string) {
 
   const { data, error } = await query;
   if (error) throw error;
-  return data;
+
+  // 각 space에 active 계약의 입주기업 정보 추가
+  return (data || []).map((space: any) => {
+    const activeContract = space.contracts?.find((c: any) => c.status === "active");
+    return {
+      ...space,
+      tenant_company: activeContract?.company || null,
+      contracts: undefined,
+    };
+  });
 }
 
 export async function getSpace(id: string) {

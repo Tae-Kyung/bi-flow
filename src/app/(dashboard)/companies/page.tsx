@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Upload } from "lucide-react";
+import { Pencil, Plus, Upload } from "lucide-react";
 
 const statusLabels: Record<string, string> = {
   active: "활동",
@@ -23,6 +23,12 @@ const statusVariants: Record<string, "default" | "secondary" | "destructive"> = 
   active: "default",
   graduated: "secondary",
   terminated: "destructive",
+};
+
+const corporateTypeLabels: Record<string, string> = {
+  corporation: "법인",
+  individual: "개인",
+  pre_startup: "예비창업",
 };
 
 const tabs = [
@@ -44,6 +50,8 @@ export default async function CompaniesPage({
 
   const isSuperAdmin = profile.role === "super_admin";
   const canCreate = isSuperAdmin || profile.role === "org_admin";
+  const isAdmin = isSuperAdmin || profile.role === "org_admin";
+  const colCount = isSuperAdmin ? 11 : 10;
 
   return (
     <div className="space-y-6">
@@ -90,55 +98,89 @@ export default async function CompaniesPage({
         })}
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {isSuperAdmin && <TableHead>기관</TableHead>}
-            <TableHead>기업명</TableHead>
-            <TableHead>사업자등록번호</TableHead>
-            <TableHead>대표자</TableHead>
-            <TableHead>연락처</TableHead>
-            <TableHead>상태</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {companies.map((company: any) => (
-            <TableRow key={company.id}>
-              {isSuperAdmin && (
-                <TableCell className="text-muted-foreground">
-                  {company.organization?.name}
-                </TableCell>
-              )}
-              <TableCell>
-                <Link
-                  href={`/companies/${company.id}`}
-                  className="font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  {company.name}
-                </Link>
-              </TableCell>
-              <TableCell>{company.biz_number}</TableCell>
-              <TableCell>{company.representative}</TableCell>
-              <TableCell>{company.phone || "-"}</TableCell>
-              <TableCell>
-                <Badge variant={statusVariants[company.status]}>
-                  {statusLabels[company.status]}
-                </Badge>
-              </TableCell>
-            </TableRow>
-          ))}
-          {companies.length === 0 && (
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell
-                colSpan={isSuperAdmin ? 6 : 5}
-                className="text-center text-muted-foreground"
-              >
-                등록된 입주기업이 없습니다.
-              </TableCell>
+              {isSuperAdmin && <TableHead>기관</TableHead>}
+              <TableHead>기업명</TableHead>
+              <TableHead>구분</TableHead>
+              <TableHead>사업자등록번호</TableHead>
+              <TableHead>대표자</TableHead>
+              <TableHead>연락처</TableHead>
+              <TableHead>설립일</TableHead>
+              <TableHead>주요 사업내용</TableHead>
+              <TableHead>주생산품</TableHead>
+              <TableHead>상태</TableHead>
+              <TableHead className="text-right">작업</TableHead>
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {companies.map((company: any) => (
+              <TableRow key={company.id}>
+                {isSuperAdmin && (
+                  <TableCell className="text-muted-foreground whitespace-nowrap">
+                    {company.organization?.name}
+                  </TableCell>
+                )}
+                <TableCell className="whitespace-nowrap">
+                  <Link
+                    href={`/companies/${company.id}`}
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    {company.name}
+                  </Link>
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {company.corporate_type ? (
+                    <Badge variant="outline">
+                      {corporateTypeLabels[company.corporate_type] || company.corporate_type}
+                    </Badge>
+                  ) : (
+                    "-"
+                  )}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">{company.biz_number}</TableCell>
+                <TableCell className="whitespace-nowrap">{company.representative}</TableCell>
+                <TableCell className="whitespace-nowrap">{company.phone || "-"}</TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {company.founding_date
+                    ? new Date(company.founding_date).toLocaleDateString("ko-KR")
+                    : "-"}
+                </TableCell>
+                <TableCell className="max-w-48 truncate" title={company.business_description || ""}>
+                  {company.business_description || "-"}
+                </TableCell>
+                <TableCell className="max-w-36 truncate" title={company.main_products || ""}>
+                  {company.main_products || "-"}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={statusVariants[company.status]}>
+                    {statusLabels[company.status]}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Link href={`/companies/${company.id}`}>
+                    <Button variant="ghost" size="icon">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </TableCell>
+              </TableRow>
+            ))}
+            {companies.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={colCount}
+                  className="text-center text-muted-foreground"
+                >
+                  등록된 입주기업이 없습니다.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

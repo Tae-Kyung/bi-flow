@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Upload } from "lucide-react";
+import { Pencil, Plus, Upload } from "lucide-react";
 
 const statusLabels: Record<string, string> = {
   vacant: "공실",
@@ -29,6 +29,7 @@ export default async function SpacesPage() {
 
   const isSuperAdmin = profile.role === "super_admin";
   const canCreate = isSuperAdmin || profile.role === "org_admin";
+  const colCount = isSuperAdmin ? 8 : 7;
 
   return (
     <div className="space-y-6">
@@ -59,14 +60,17 @@ export default async function SpacesPage() {
             <TableHead>호실명</TableHead>
             <TableHead>층</TableHead>
             <TableHead className="text-right">전용면적 (m²)</TableHead>
+            <TableHead>설명</TableHead>
             <TableHead>상태</TableHead>
+            <TableHead>입주기업</TableHead>
+            <TableHead className="text-right">작업</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {spaces.map((space: any) => (
             <TableRow key={space.id}>
               {isSuperAdmin && (
-                <TableCell className="text-muted-foreground">
+                <TableCell className="text-muted-foreground whitespace-nowrap">
                   {space.organization?.name}
                 </TableCell>
               )}
@@ -80,17 +84,39 @@ export default async function SpacesPage() {
               </TableCell>
               <TableCell>{space.floor || "-"}</TableCell>
               <TableCell className="text-right">{space.area}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {space.description || "-"}
+              </TableCell>
               <TableCell>
                 <Badge variant={statusVariants[space.status]}>
                   {statusLabels[space.status]}
                 </Badge>
+              </TableCell>
+              <TableCell>
+                {space.tenant_company ? (
+                  <Link
+                    href={`/companies/${space.tenant_company.id}`}
+                    className="text-sm text-primary underline-offset-4 hover:underline"
+                  >
+                    {space.tenant_company.name}
+                  </Link>
+                ) : (
+                  <span className="text-sm text-muted-foreground">-</span>
+                )}
+              </TableCell>
+              <TableCell className="text-right">
+                <Link href={`/spaces/${space.id}`}>
+                  <Button variant="ghost" size="icon">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </Link>
               </TableCell>
             </TableRow>
           ))}
           {spaces.length === 0 && (
             <TableRow>
               <TableCell
-                colSpan={isSuperAdmin ? 5 : 4}
+                colSpan={colCount}
                 className="text-center text-muted-foreground"
               >
                 등록된 공간이 없습니다.

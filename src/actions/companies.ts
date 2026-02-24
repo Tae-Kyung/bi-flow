@@ -77,6 +77,18 @@ export async function createCompany(formData: FormData) {
     phone: (formData.get("phone") as string) || null,
     email: (formData.get("email") as string) || null,
     address: (formData.get("address") as string) || null,
+    corporate_type: (formData.get("corporate_type") as string) || null,
+    founding_date: (formData.get("founding_date") as string) || null,
+    business_description: (formData.get("business_description") as string) || null,
+    main_products: (formData.get("main_products") as string) || null,
+    website: (formData.get("website") as string) || null,
+    contact_name: (formData.get("contact_name") as string) || null,
+    contact_phone: (formData.get("contact_phone") as string) || null,
+    contact_email: (formData.get("contact_email") as string) || null,
+    office_phone: (formData.get("office_phone") as string) || null,
+    fax: (formData.get("fax") as string) || null,
+    certification_expiry: (formData.get("certification_expiry") as string) || null,
+    notes: (formData.get("notes") as string) || null,
   });
 
   if (error) throw error;
@@ -102,9 +114,21 @@ export async function bulkCreateCompanies(
     name: string;
     biz_number: string;
     representative: string;
+    corporate_type?: string;
+    founding_date?: string;
+    business_description?: string;
+    main_products?: string;
+    website?: string;
     phone?: string;
     email?: string;
     address?: string;
+    contact_name?: string;
+    contact_phone?: string;
+    contact_email?: string;
+    office_phone?: string;
+    fax?: string;
+    certification_expiry?: string;
+    notes?: string;
   }[]
 ): Promise<{ inserted: number }> {
   const profile = await requireAuth();
@@ -133,9 +157,21 @@ export async function bulkCreateCompanies(
     name: row.name,
     biz_number: row.biz_number,
     representative: row.representative,
+    corporate_type: row.corporate_type || null,
+    founding_date: row.founding_date || null,
+    business_description: row.business_description || null,
+    main_products: row.main_products || null,
+    website: row.website || null,
     phone: row.phone || null,
     email: row.email || null,
     address: row.address || null,
+    contact_name: row.contact_name || null,
+    contact_phone: row.contact_phone || null,
+    contact_email: row.contact_email || null,
+    office_phone: row.office_phone || null,
+    fax: row.fax || null,
+    certification_expiry: row.certification_expiry || null,
+    notes: row.notes || null,
   }));
 
   const { error } = await supabase.from("companies").insert(insertData);
@@ -166,6 +202,18 @@ export async function updateCompany(id: string, formData: FormData) {
     email: (formData.get("email") as string) || null,
     address: (formData.get("address") as string) || null,
     status: newStatus,
+    corporate_type: (formData.get("corporate_type") as string) || null,
+    founding_date: (formData.get("founding_date") as string) || null,
+    business_description: (formData.get("business_description") as string) || null,
+    main_products: (formData.get("main_products") as string) || null,
+    website: (formData.get("website") as string) || null,
+    contact_name: (formData.get("contact_name") as string) || null,
+    contact_phone: (formData.get("contact_phone") as string) || null,
+    contact_email: (formData.get("contact_email") as string) || null,
+    office_phone: (formData.get("office_phone") as string) || null,
+    fax: (formData.get("fax") as string) || null,
+    certification_expiry: (formData.get("certification_expiry") as string) || null,
+    notes: (formData.get("notes") as string) || null,
     graduation_notes: (formData.get("graduation_notes") as string) || null,
   };
 

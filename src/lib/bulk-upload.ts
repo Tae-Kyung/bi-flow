@@ -4,21 +4,66 @@ import { z } from "zod";
 export const HEADER_MAP: Record<string, string> = {
   기업명: "name",
   사업자등록번호: "biz_number",
+  "법인/개인구분": "corporate_type",
+  구분: "corporate_type",
   대표자: "representative",
   대표자명: "representative",
+  설립일: "founding_date",
+  주요사업내용: "business_description",
+  주생산품: "main_products",
+  홈페이지: "website",
   연락처: "phone",
+  "대표 휴대폰": "phone",
   이메일: "email",
+  "대표 이메일": "email",
   주소: "address",
+  담당자명: "contact_name",
+  "담당자 연락처": "contact_phone",
+  "담당자 이메일": "contact_email",
+  "사무실 전화": "office_phone",
+  팩스: "fax",
+  "인증 만료일": "certification_expiry",
+  비고: "notes",
 };
 
 // Template column order (Korean headers)
 export const TEMPLATE_COLUMNS = [
   "기업명",
   "사업자등록번호",
+  "법인/개인구분",
   "대표자명",
+  "설립일",
+  "주요사업내용",
+  "주생산품",
+  "홈페이지",
   "연락처",
   "이메일",
   "주소",
+  "담당자명",
+  "담당자 연락처",
+  "담당자 이메일",
+  "사무실 전화",
+  "팩스",
+  "인증 만료일",
+  "비고",
+];
+
+// Sample data for template (2 rows)
+export const TEMPLATE_SAMPLE_DATA = [
+  [
+    "(주)테크스타트", "101-01-00001", "법인", "김민수", "2020-03-15",
+    "SW개발 / 모바일앱", "AI 고객분석 솔루션", "https://techstart.example.com",
+    "010-1111-0001", "techstart@example.com", "경남 진주시 진주대로 501",
+    "이수정", "010-1111-1001", "admin@techstart.example.com",
+    "055-111-0001", "055-111-0002", "2026-08-31", "벤처기업 인증",
+  ],
+  [
+    "아이디어팜", "101-01-00003", "개인", "박지영", "2022-01-10",
+    "디자인 / UX컨설팅", "UX 리서치 서비스", "",
+    "010-1111-0003", "ideafarm@example.com", "경남 진주시 동진로 55",
+    "", "", "",
+    "", "", "", "1인 창업",
+  ],
 ];
 
 // Required DB columns
@@ -29,6 +74,11 @@ export const companyRowSchema = z.object({
   name: z.string().min(1, "기업명은 필수입니다"),
   biz_number: z.string().min(1, "사업자등록번호는 필수입니다"),
   representative: z.string().min(1, "대표자명은 필수입니다"),
+  corporate_type: z.string().optional().default(""),
+  founding_date: z.string().optional().default(""),
+  business_description: z.string().optional().default(""),
+  main_products: z.string().optional().default(""),
+  website: z.string().optional().default(""),
   phone: z.string().optional().default(""),
   email: z
     .string()
@@ -37,6 +87,18 @@ export const companyRowSchema = z.object({
     .optional()
     .default(""),
   address: z.string().optional().default(""),
+  contact_name: z.string().optional().default(""),
+  contact_phone: z.string().optional().default(""),
+  contact_email: z
+    .string()
+    .email("올바른 이메일 형식이 아닙니다")
+    .or(z.literal(""))
+    .optional()
+    .default(""),
+  office_phone: z.string().optional().default(""),
+  fax: z.string().optional().default(""),
+  certification_expiry: z.string().optional().default(""),
+  notes: z.string().optional().default(""),
 });
 
 export type CompanyRowData = z.infer<typeof companyRowSchema>;
@@ -65,6 +127,16 @@ export function mapHeaders(
     if (dbCol) {
       mapped[dbCol] = String(value ?? "").trim();
     }
+  }
+  // Map Korean corporate_type values to DB values
+  if (mapped.corporate_type) {
+    const typeMap: Record<string, string> = {
+      "법인": "corporation",
+      "개인": "individual",
+      "예비창업": "pre_startup",
+      "예비창업자": "pre_startup",
+    };
+    mapped.corporate_type = typeMap[mapped.corporate_type] || mapped.corporate_type;
   }
   return mapped;
 }
