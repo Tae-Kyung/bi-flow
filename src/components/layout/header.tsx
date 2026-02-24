@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LogOut } from "lucide-react";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import type { Profile } from "@/types";
 
 const roleLabels: Record<string, string> = {
@@ -37,6 +38,7 @@ export function Header({
         )}
       </div>
       <div className="flex items-center gap-3">
+        <NotificationBell />
         <Badge variant="secondary">{roleLabels[profile.role]}</Badge>
         <span className="text-sm">{profile.name || profile.email}</span>
         <Button variant="ghost" size="icon" onClick={handleLogout}>

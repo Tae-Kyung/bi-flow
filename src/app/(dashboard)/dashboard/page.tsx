@@ -13,6 +13,7 @@ import {
   TrendingUp,
   AlertTriangle,
 } from "lucide-react";
+import { CheckExpiringButton } from "@/components/dashboard/check-expiring-button";
 
 export default async function DashboardPage() {
   const profile = await requireAuth();
@@ -244,12 +245,17 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">30일 내 만료 예정</CardTitle>
-            {(expiringContracts?.length ?? 0) > 0 && (
-              <Badge variant="destructive" className="gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                {expiringContracts?.length}건
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {(isSuperAdmin || profile.role === "org_admin") && (
+                <CheckExpiringButton />
+              )}
+              {(expiringContracts?.length ?? 0) > 0 && (
+                <Badge variant="destructive" className="gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {expiringContracts?.length}건
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {expiringContracts && expiringContracts.length > 0 ? (

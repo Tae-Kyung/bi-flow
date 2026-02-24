@@ -5,7 +5,7 @@ import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import type { CompanyStatus } from "@/types";
 
-export async function getCompanies(orgId?: string) {
+export async function getCompanies(orgId?: string, status?: string) {
   const profile = await requireAuth();
   const supabase = await createClient();
 
@@ -16,10 +16,36 @@ export async function getCompanies(orgId?: string) {
 
   const filterOrgId = orgId || (profile.role !== "super_admin" ? profile.org_id : null);
   if (filterOrgId) query = query.eq("org_id", filterOrgId);
+  if (status) query = query.eq("status", status);
 
   const { data, error } = await query;
   if (error) throw error;
   return data;
+}
+
+export async function getCompanyStatusCounts() {
+  const profile = await requireAuth();
+  const supabase = await createClient();
+
+  const statuses = ["active", "graduated", "terminated"] as const;
+  const counts: Record<string, number> = {};
+
+  for (const s of statuses) {
+    let query = supabase
+      .from("companies")
+      .select("*", { count: "exact", head: true })
+      .eq("status", s);
+
+    if (profile.role !== "super_admin" && profile.org_id) {
+      query = query.eq("org_id", profile.org_id);
+    }
+
+    const { count } = await query;
+    counts[s] = count ?? 0;
+  }
+
+  counts.all = Object.values(counts).reduce((a, b) => a + b, 0);
+  return counts;
 }
 
 export async function getCompany(id: string) {
@@ -123,17 +149,36 @@ export async function updateCompany(id: string, formData: FormData) {
   await requireAuth();
   const supabase = await createClient();
 
+  const newStatus = (formData.get("status") as CompanyStatus) || "active";
+
+  // 기존 데이터 조회 (graduated_at 설정 여부 판단)
+  const { data: existing } = await supabase
+    .from("companies")
+    .select("graduated_at")
+    .eq("id", id)
+    .single();
+
+  const updateData: Record<string, unknown> = {
+    name: formData.get("name") as string,
+    biz_number: formData.get("biz_number") as string,
+    representative: formData.get("representative") as string,
+    phone: (formData.get("phone") as string) || null,
+    email: (formData.get("email") as string) || null,
+    address: (formData.get("address") as string) || null,
+    status: newStatus,
+    graduation_notes: (formData.get("graduation_notes") as string) || null,
+  };
+
+  // graduated 상태로 변경 시 graduated_at 자동 설정
+  if (newStatus === "graduated" && !existing?.graduated_at) {
+    updateData.graduated_at = new Date().toISOString();
+  } else if (newStatus !== "graduated") {
+    updateData.graduated_at = null;
+  }
+
   const { error } = await supabase
     .from("companies")
-    .update({
-      name: formData.get("name") as string,
-      biz_number: formData.get("biz_number") as string,
-      representative: formData.get("representative") as string,
-      phone: (formData.get("phone") as string) || null,
-      email: (formData.get("email") as string) || null,
-      address: (formData.get("address") as string) || null,
-      status: (formData.get("status") as CompanyStatus) || "active",
-    })
+    .update(updateData)
     .eq("id", id);
 
   if (error) throw error;

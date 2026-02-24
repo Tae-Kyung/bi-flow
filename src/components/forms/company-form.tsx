@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createCompany, updateCompany } from "@/actions/companies";
-import type { Company, Organization } from "@/types";
+import type { Company, CompanyStatus, Organization } from "@/types";
 
 interface Props {
   company?: Company;
@@ -25,6 +26,9 @@ interface Props {
 export function CompanyForm({ company, organizations, showOrgSelect }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState(
+    company?.status || "active"
+  );
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -127,19 +131,43 @@ export function CompanyForm({ company, organizations, showOrgSelect }: Props) {
           </div>
 
           {company && (
-            <div className="space-y-2">
-              <Label htmlFor="status">상태</Label>
-              <Select name="status" defaultValue={company.status}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">활동</SelectItem>
-                  <SelectItem value="graduated">졸업</SelectItem>
-                  <SelectItem value="terminated">해지</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="status">상태</Label>
+                <Select
+                  name="status"
+                  defaultValue={company.status}
+                  onValueChange={(v) => setSelectedStatus(v as CompanyStatus)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">활동</SelectItem>
+                    <SelectItem value="graduated">졸업</SelectItem>
+                    <SelectItem value="terminated">해지</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedStatus === "graduated" && (
+                <div className="space-y-2">
+                  <Label htmlFor="graduation_notes">졸업 메모</Label>
+                  <Textarea
+                    id="graduation_notes"
+                    name="graduation_notes"
+                    placeholder="졸업 사유, 성과 등을 기록하세요."
+                    defaultValue={company.graduation_notes || ""}
+                    rows={3}
+                  />
+                  {company.graduated_at && (
+                    <p className="text-xs text-muted-foreground">
+                      졸업일: {new Date(company.graduated_at).toLocaleDateString("ko-KR")}
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           <div className="flex gap-2">

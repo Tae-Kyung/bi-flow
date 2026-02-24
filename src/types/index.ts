@@ -88,6 +88,8 @@ export interface Company {
   email: string | null;
   address: string | null;
   status: CompanyStatus;
+  graduation_notes: string | null;
+  graduated_at: string | null;
   created_at: string;
   updated_at: string;
   organization?: Organization;

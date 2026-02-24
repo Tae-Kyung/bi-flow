@@ -1,5 +1,5 @@
 import { requireAuth } from "@/lib/auth";
-import { getCompanies } from "@/actions/companies";
+import { getCompanies, getCompanyStatusCounts } from "@/actions/companies";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,9 +25,22 @@ const statusVariants: Record<string, "default" | "secondary" | "destructive"> = 
   terminated: "destructive",
 };
 
-export default async function CompaniesPage() {
+const tabs = [
+  { key: "", label: "전체" },
+  { key: "active", label: "활동" },
+  { key: "graduated", label: "졸업" },
+  { key: "terminated", label: "해지" },
+];
+
+export default async function CompaniesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   const profile = await requireAuth();
-  const companies = await getCompanies();
+  const { status } = await searchParams;
+  const companies = await getCompanies(undefined, status);
+  const counts = await getCompanyStatusCounts();
 
   const isSuperAdmin = profile.role === "super_admin";
   const canCreate = isSuperAdmin || profile.role === "org_admin";
@@ -52,6 +65,29 @@ export default async function CompaniesPage() {
             </Link>
           </div>
         )}
+      </div>
+
+      {/* 상태별 필터 탭 */}
+      <div className="flex gap-2">
+        {tabs.map((tab) => {
+          const isActive = (status || "") === tab.key;
+          const count = tab.key ? counts[tab.key] ?? 0 : counts.all ?? 0;
+          return (
+            <Link
+              key={tab.key}
+              href={
+                tab.key ? `/companies?status=${tab.key}` : "/companies"
+              }
+            >
+              <Badge
+                variant={isActive ? "default" : "outline"}
+                className="cursor-pointer px-3 py-1 text-sm"
+              >
+                {tab.label} {count}
+              </Badge>
+            </Link>
+          );
+        })}
       </div>
 
       <Table>
