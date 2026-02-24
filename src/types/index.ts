@@ -102,6 +102,7 @@ export interface Contract {
   end_date: string;
   rent_amount: number;
   deposit: number;
+  previous_contract_id: string | null;
   status: ContractStatus;
   created_at: string;
   updated_at: string;

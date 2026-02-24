@@ -112,3 +112,45 @@ export async function updateContract(id: string, formData: FormData) {
   revalidatePath(`/contracts/${id}`);
   revalidatePath("/spaces");
 }
+
+export async function renewContract(oldContractId: string, formData: FormData) {
+  await requireAuth();
+  const supabase = await createClient();
+
+  // 1. 기존 계약 조회 + active 검증
+  const { data: oldContract, error: fetchError } = await supabase
+    .from("contracts")
+    .select("*")
+    .eq("id", oldContractId)
+    .single();
+
+  if (fetchError || !oldContract) throw new Error("기존 계약을 찾을 수 없습니다.");
+  if (oldContract.status !== "active") throw new Error("활성 상태의 계약만 연장할 수 있습니다.");
+
+  // 2. 기존 계약을 expired로 직접 업데이트 (updateContract 우회 → 공간 상태 변경 없음)
+  const { error: expireError } = await supabase
+    .from("contracts")
+    .update({ status: "expired" })
+    .eq("id", oldContractId);
+
+  if (expireError) throw expireError;
+
+  // 3. 새 계약 생성 (same company_id, space_id, org_id + previous_contract_id)
+  const { error: insertError } = await supabase.from("contracts").insert({
+    org_id: oldContract.org_id,
+    company_id: oldContract.company_id,
+    space_id: oldContract.space_id,
+    start_date: formData.get("start_date") as string,
+    end_date: formData.get("end_date") as string,
+    rent_amount: Number(formData.get("rent_amount")) || 0,
+    deposit: Number(formData.get("deposit")) || 0,
+    status: "active",
+    previous_contract_id: oldContractId,
+  });
+
+  if (insertError) throw insertError;
+
+  revalidatePath("/contracts");
+  revalidatePath(`/contracts/${oldContractId}`);
+  revalidatePath("/spaces");
+}

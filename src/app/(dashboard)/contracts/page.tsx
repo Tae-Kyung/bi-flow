@@ -73,8 +73,11 @@ export default async function ContractsPage() {
                   )}
                   {days === null && "-"}
                 </TableCell>
-                <TableCell>
+                <TableCell className="flex items-center gap-1">
                   <Badge variant={statusVariants[c.status]}>{statusLabels[c.status]}</Badge>
+                  {c.previous_contract_id && (
+                    <Badge variant="outline">연장</Badge>
+                  )}
                 </TableCell>
               </TableRow>
             );
