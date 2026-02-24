@@ -54,6 +54,64 @@ export async function createSpace(formData: FormData) {
   revalidatePath("/spaces");
 }
 
+export async function getExistingSpaceNames(orgId: string): Promise<string[]> {
+  await requireAuth();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("spaces")
+    .select("name")
+    .eq("org_id", orgId);
+
+  if (error) throw error;
+  return (data || []).map((row: { name: string }) => row.name);
+}
+
+export async function bulkCreateSpaces(
+  orgId: string,
+  rows: {
+    name: string;
+    area: number;
+    floor?: string;
+    description?: string;
+  }[]
+): Promise<{ inserted: number }> {
+  const profile = await requireAuth();
+  const supabase = await createClient();
+
+  if (
+    profile.role !== "super_admin" &&
+    profile.role !== "org_admin"
+  ) {
+    throw new Error("권한이 없습니다.");
+  }
+
+  if (
+    profile.role === "org_admin" &&
+    profile.org_id !== orgId
+  ) {
+    throw new Error("다른 기관에 공간을 등록할 수 없습니다.");
+  }
+
+  if (rows.length === 0) {
+    throw new Error("등록할 공간이 없습니다.");
+  }
+
+  const insertData = rows.map((row) => ({
+    org_id: orgId,
+    name: row.name,
+    area: row.area,
+    floor: row.floor || null,
+    description: row.description || null,
+  }));
+
+  const { error } = await supabase.from("spaces").insert(insertData);
+
+  if (error) throw error;
+  revalidatePath("/spaces");
+  return { inserted: insertData.length };
+}
+
 export async function updateSpace(id: string, formData: FormData) {
   await requireAuth();
   const supabase = await createClient();

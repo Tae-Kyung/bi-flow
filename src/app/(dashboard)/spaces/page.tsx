@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 
 const statusLabels: Record<string, string> = {
   vacant: "공실",
@@ -35,12 +35,20 @@ export default async function SpacesPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">공간 관리</h1>
         {canCreate && (
-          <Link href="/spaces/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              공간 등록
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/spaces/bulk-upload">
+              <Button variant="outline">
+                <Upload className="mr-2 h-4 w-4" />
+                일괄 등록
+              </Button>
+            </Link>
+            <Link href="/spaces/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                공간 등록
+              </Button>
+            </Link>
+          </div>
         )}
       </div>
 
