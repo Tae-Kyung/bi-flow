@@ -26,6 +26,74 @@ export async function getContracts(orgId?: string) {
   return data;
 }
 
+export async function getActiveContractByCompany(companyId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("contracts")
+    .select("id, start_date, end_date, rent_amount, deposit, space:spaces(id, name, area, floor)")
+    .eq("company_id", companyId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data;
+}
+
+export async function assignCompanySpace(
+  companyId: string,
+  orgId: string,
+  spaceId: string,
+  startDate: string,
+  endDate: string,
+  rentAmount: number,
+  deposit: number
+) {
+  await requireAuth();
+  const supabase = await createClient();
+
+  // 기존 활성 계약 조회
+  const { data: existing } = await supabase
+    .from("contracts")
+    .select("id, space_id")
+    .eq("company_id", companyId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (existing) {
+    // 기존 계약 업데이트
+    const { error } = await supabase
+      .from("contracts")
+      .update({ space_id: spaceId, start_date: startDate, end_date: endDate, rent_amount: rentAmount, deposit })
+      .eq("id", existing.id);
+    if (error) throw new Error(error.message);
+
+    // 기존 호실 → 공실
+    if (existing.space_id && existing.space_id !== spaceId) {
+      await supabase.from("spaces").update({ status: "vacant" }).eq("id", existing.space_id);
+    }
+  } else {
+    // 새 계약 생성
+    const { error } = await supabase.from("contracts").insert({
+      org_id: orgId,
+      company_id: companyId,
+      space_id: spaceId,
+      start_date: startDate,
+      end_date: endDate,
+      rent_amount: rentAmount,
+      deposit,
+      status: "active",
+    });
+    if (error) throw new Error(error.message);
+  }
+
+  // 새 호실 → 입주
+  await supabase.from("spaces").update({ status: "occupied" }).eq("id", spaceId);
+
+  revalidatePath(`/companies/${companyId}`);
+  revalidatePath("/contracts");
+  revalidatePath("/spaces");
+}
+
 export async function getContract(id: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
