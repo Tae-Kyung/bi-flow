@@ -35,7 +35,7 @@ import {
 import type { ParsedRow } from "@/lib/bulk-upload";
 import {
   getExistingBizNumbers,
-  bulkCreateCompanies,
+  createOneCompany,
 } from "@/actions/companies";
 import type { Organization } from "@/types";
 import { Upload, Download, FileSpreadsheet, ArrowLeft, Check, X } from "lucide-react";
@@ -91,9 +91,10 @@ export function BulkUploadClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [orgId, setOrgId] = useState(defaultOrgId || "");
   const [rows, setRows] = useState<ParsedRow[]>([]);
-  const [step, setStep] = useState<"upload" | "preview">("upload");
+  const [step, setStep] = useState<"upload" | "preview" | "progress">("upload");
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [progress, setProgress] = useState({ current: 0, total: 0, failed: 0 });
 
   const validRows = rows.filter(
     (r) => Object.keys(r.errors).length === 0 && !r.isDuplicate
@@ -257,7 +258,7 @@ export function BulkUploadClient({
     );
   }, [validRows]);
 
-  // Submit selected rows
+  // Submit selected rows (1건씩 처리 → 진행률 표시)
   const handleSubmit = useCallback(async () => {
     const effectiveOrgId = orgId || defaultOrgId || "";
     if (!effectiveOrgId) {
@@ -275,20 +276,37 @@ export function BulkUploadClient({
     }
 
     setLoading(true);
-    try {
-      const result = await bulkCreateCompanies(effectiveOrgId, toInsert);
-      if (result.contracted > 0) {
-        toast.success(`${result.inserted}건의 기업이 등록되었습니다. (계약 ${result.contracted}건 자동 생성)`);
-      } else {
-        toast.success(`${result.inserted}건의 기업이 등록되었습니다.`);
+    setProgress({ current: 0, total: toInsert.length, failed: 0 });
+    setStep("progress");
+
+    let inserted = 0;
+    let contracted = 0;
+    let failed = 0;
+
+    for (const row of toInsert) {
+      try {
+        const result = await createOneCompany(effectiveOrgId, row);
+        inserted++;
+        if (result.contracted) contracted++;
+      } catch {
+        failed++;
       }
-      router.push("/companies");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "등록 중 오류가 발생했습니다."
-      );
-      setLoading(false);
+      setProgress((prev) => ({ ...prev, current: prev.current + 1, failed }));
     }
+
+    setLoading(false);
+
+    if (inserted === 0) {
+      toast.error("등록된 기업이 없습니다. 오류를 확인해주세요.");
+      setStep("preview");
+      return;
+    }
+
+    const msg = contracted > 0
+      ? `${inserted}건 등록 완료 (계약 ${contracted}건 자동 생성${failed > 0 ? `, 실패 ${failed}건` : ""})`
+      : `${inserted}건 등록 완료${failed > 0 ? ` (실패 ${failed}건)` : ""}`;
+    toast.success(msg);
+    router.push("/companies");
   }, [orgId, defaultOrgId, selectedRows, router]);
 
   // Reset to upload step
@@ -296,10 +314,68 @@ export function BulkUploadClient({
     setRows([]);
     setStep("upload");
     setFileName("");
+    setProgress({ current: 0, total: 0, failed: 0 });
   }, []);
+
+  const progressPct = progress.total > 0
+    ? Math.round((progress.current / progress.total) * 100)
+    : 0;
 
   return (
     <div className="space-y-6">
+
+      {/* 진행 현황 화면 */}
+      {step === "progress" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>등록 진행 중...</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* 진행률 바 */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>{progress.current} / {progress.total}건 처리됨</span>
+                <span>{progressPct}%</span>
+              </div>
+              <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-3 rounded-full bg-primary transition-all duration-300"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+
+            {/* 상태 요약 */}
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="rounded-md border p-3">
+                <div className="text-2xl font-bold text-green-600">
+                  {progress.current - progress.failed}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">등록 성공</p>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-2xl font-bold text-destructive">
+                  {progress.failed}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">실패</p>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-2xl font-bold text-muted-foreground">
+                  {progress.total - progress.current}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">대기 중</p>
+              </div>
+            </div>
+
+            {loading && (
+              <p className="text-center text-sm text-muted-foreground animate-pulse">
+                잠시만 기다려 주세요...
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {step === "upload" && (
         <Card>
           <CardHeader>
