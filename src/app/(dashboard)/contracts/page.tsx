@@ -6,7 +6,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 
 const statusLabels: Record<string, string> = {
   draft: "초안",
@@ -36,9 +36,17 @@ export default async function ContractsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">계약 관리</h1>
         {canCreate && (
-          <Link href="/contracts/new">
-            <Button><Plus className="mr-2 h-4 w-4" />계약 생성</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/contracts/bulk-renew">
+              <Button variant="outline">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                일괄 갱신
+              </Button>
+            </Link>
+            <Link href="/contracts/new">
+              <Button><Plus className="mr-2 h-4 w-4" />계약 생성</Button>
+            </Link>
+          </div>
         )}
       </div>
       <Table>

@@ -24,6 +24,17 @@ export const HEADER_MAP: Record<string, string> = {
   팩스: "fax",
   "인증 만료일": "certification_expiry",
   비고: "notes",
+  // 신규 필드
+  입주호실: "space_name",
+  최초입주일: "move_in_date",
+  계약시작일: "contract_start_date",
+  계약만료일: "contract_end_date",
+  "담당자2 이름": "contact_name_2",
+  "담당자2 연락처": "contact_phone_2",
+  "담당자2 이메일": "contact_email_2",
+  "담당자3 이름": "contact_name_3",
+  "담당자3 연락처": "contact_phone_3",
+  "담당자3 이메일": "contact_email_3",
 };
 
 // Template column order (Korean headers)
@@ -39,9 +50,19 @@ export const TEMPLATE_COLUMNS = [
   "연락처",
   "이메일",
   "주소",
+  "입주호실",
+  "최초입주일",
+  "계약시작일",
+  "계약만료일",
   "담당자명",
   "담당자 연락처",
   "담당자 이메일",
+  "담당자2 이름",
+  "담당자2 연락처",
+  "담당자2 이메일",
+  "담당자3 이름",
+  "담당자3 연락처",
+  "담당자3 이메일",
   "사무실 전화",
   "팩스",
   "인증 만료일",
@@ -54,13 +75,19 @@ export const TEMPLATE_SAMPLE_DATA = [
     "(주)테크스타트", "101-01-00001", "법인", "김민수", "2020-03-15",
     "SW개발 / 모바일앱", "AI 고객분석 솔루션", "https://techstart.example.com",
     "010-1111-0001", "techstart@example.com", "경남 진주시 진주대로 501",
+    "A-101", "2023-03-15", "2023-03-15", "2024-03-14",
     "이수정", "010-1111-1001", "admin@techstart.example.com",
+    "", "", "",
+    "", "", "",
     "055-111-0001", "055-111-0002", "2026-08-31", "벤처기업 인증",
   ],
   [
     "아이디어팜", "101-01-00003", "개인", "박지영", "2022-01-10",
     "디자인 / UX컨설팅", "UX 리서치 서비스", "",
     "010-1111-0003", "ideafarm@example.com", "경남 진주시 동진로 55",
+    "", "", "", "",
+    "", "", "",
+    "", "", "",
     "", "", "",
     "", "", "", "1인 창업",
   ],
@@ -87,9 +114,31 @@ export const companyRowSchema = z.object({
     .optional()
     .default(""),
   address: z.string().optional().default(""),
+  // 입주/계약 정보
+  space_name: z.string().optional().default(""),
+  move_in_date: z.string().optional().default(""),
+  contract_start_date: z.string().optional().default(""),
+  contract_end_date: z.string().optional().default(""),
+  // 담당자
   contact_name: z.string().optional().default(""),
   contact_phone: z.string().optional().default(""),
   contact_email: z
+    .string()
+    .email("올바른 이메일 형식이 아닙니다")
+    .or(z.literal(""))
+    .optional()
+    .default(""),
+  contact_name_2: z.string().optional().default(""),
+  contact_phone_2: z.string().optional().default(""),
+  contact_email_2: z
+    .string()
+    .email("올바른 이메일 형식이 아닙니다")
+    .or(z.literal(""))
+    .optional()
+    .default(""),
+  contact_name_3: z.string().optional().default(""),
+  contact_phone_3: z.string().optional().default(""),
+  contact_email_3: z
     .string()
     .email("올바른 이메일 형식이 아닙니다")
     .or(z.literal(""))
@@ -114,6 +163,19 @@ export interface ParsedRow {
 }
 
 /**
+ * Format a value to a YYYY-MM-DD date string if it's a Date object.
+ */
+function formatValue(value: unknown): string {
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  return String(value ?? "").trim();
+}
+
+/**
  * Map raw row object (Korean headers) to DB column names.
  * Returns null values as empty strings.
  */
@@ -122,10 +184,11 @@ export function mapHeaders(
 ): Record<string, string> {
   const mapped: Record<string, string> = {};
   for (const [header, value] of Object.entries(row)) {
-    const trimmedHeader = header.trim();
+    // Strip BOM and whitespace from header
+    const trimmedHeader = header.trim().replace(/^\uFEFF/, "");
     const dbCol = HEADER_MAP[trimmedHeader];
     if (dbCol) {
-      mapped[dbCol] = String(value ?? "").trim();
+      mapped[dbCol] = formatValue(value);
     }
   }
   // Map Korean corporate_type values to DB values
@@ -149,12 +212,13 @@ export function getMissingColumns(
   headers: string[]
 ): string[] {
   const mappedCols = new Set(
-    headers.map((h) => HEADER_MAP[h.trim()]).filter(Boolean)
+    headers
+      .map((h) => HEADER_MAP[h.trim().replace(/^\uFEFF/, "")])
+      .filter(Boolean)
   );
   const missing: string[] = [];
   for (const reqCol of REQUIRED_COLUMNS) {
     if (!mappedCols.has(reqCol)) {
-      // Find Korean name for this column
       const koreanName = Object.entries(HEADER_MAP).find(
         ([, v]) => v === reqCol
       )?.[0];

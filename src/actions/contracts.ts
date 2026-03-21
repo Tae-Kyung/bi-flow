@@ -113,6 +113,49 @@ export async function updateContract(id: string, formData: FormData) {
   revalidatePath("/spaces");
 }
 
+export async function bulkRenewContracts(
+  renewals: { contractId: string; newEndDate: string; newStartDate: string }[]
+): Promise<{ renewed: number }> {
+  await requireAuth();
+  const supabase = await createClient();
+
+  let renewed = 0;
+  for (const renewal of renewals) {
+    const { data: oldContract, error: fetchError } = await supabase
+      .from("contracts")
+      .select("*")
+      .eq("id", renewal.contractId)
+      .single();
+
+    if (fetchError || !oldContract || oldContract.status !== "active") continue;
+
+    // 기존 계약 만료 처리
+    await supabase
+      .from("contracts")
+      .update({ status: "expired" })
+      .eq("id", renewal.contractId);
+
+    // 새 계약 생성
+    await supabase.from("contracts").insert({
+      org_id: oldContract.org_id,
+      company_id: oldContract.company_id,
+      space_id: oldContract.space_id,
+      start_date: renewal.newStartDate,
+      end_date: renewal.newEndDate,
+      rent_amount: oldContract.rent_amount,
+      deposit: oldContract.deposit,
+      status: "active",
+      previous_contract_id: renewal.contractId,
+    });
+
+    renewed++;
+  }
+
+  revalidatePath("/contracts");
+  revalidatePath("/spaces");
+  return { renewed };
+}
+
 export async function renewContract(oldContractId: string, formData: FormData) {
   await requireAuth();
   const supabase = await createClient();

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Plus, Upload } from "lucide-react";
+import { SpaceDeleteButton } from "@/components/forms/space-delete-button";
 
 const statusLabels: Record<string, string> = {
   vacant: "공실",
@@ -105,11 +106,16 @@ export default async function SpacesPage() {
                 )}
               </TableCell>
               <TableCell className="text-right">
-                <Link href={`/spaces/${space.id}`}>
-                  <Button variant="ghost" size="icon">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </Link>
+                <div className="flex items-center justify-end gap-1">
+                  <Link href={`/spaces/${space.id}`}>
+                    <Button variant="ghost" size="icon">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  {canCreate && (
+                    <SpaceDeleteButton spaceId={space.id} spaceName={space.name} />
+                  )}
+                </div>
               </TableCell>
             </TableRow>
           ))}

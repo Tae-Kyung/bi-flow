@@ -16,23 +16,55 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createCompany, updateCompany } from "@/actions/companies";
-import type { Company, CompanyStatus, Organization } from "@/types";
+import type { Company, CompanyStatus, Organization, Space } from "@/types";
+import { Plus, Trash2 } from "lucide-react";
+
+interface ContactEntry {
+  name: string;
+  phone: string;
+  email: string;
+}
 
 interface Props {
   company?: Company;
   organizations?: Organization[];
+  spaces?: Space[];
   showOrgSelect?: boolean;
 }
 
-export function CompanyForm({ company, organizations, showOrgSelect }: Props) {
+export function CompanyForm({ company, organizations, spaces, showOrgSelect }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState(
     company?.status || "active"
   );
 
+  // 추가 담당자 (extra_contacts)
+  const [extraContacts, setExtraContacts] = useState<ContactEntry[]>(
+    company?.extra_contacts || []
+  );
+
+  // 계약 생성 여부 (신규 등록 시만)
+  const [createContract, setCreateContract] = useState(false);
+
+  function addContact() {
+    setExtraContacts((prev) => [...prev, { name: "", phone: "", email: "" }]);
+  }
+
+  function removeContact(index: number) {
+    setExtraContacts((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateContact(index: number, field: keyof ContactEntry, value: string) {
+    setExtraContacts((prev) =>
+      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
+    );
+  }
+
   async function handleSubmit(formData: FormData) {
     setLoading(true);
+    // 추가 담당자 JSON 직렬화
+    formData.set("extra_contacts", JSON.stringify(extraContacts));
     try {
       if (company) {
         await updateCompany(company.id, formData);
@@ -44,6 +76,8 @@ export function CompanyForm({ company, organizations, showOrgSelect }: Props) {
       setLoading(false);
     }
   }
+
+  const vacantSpaces = (spaces || []).filter((s) => s.status === "vacant");
 
   return (
     <Card>
@@ -77,12 +111,7 @@ export function CompanyForm({ company, organizations, showOrgSelect }: Props) {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">기업명 *</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  defaultValue={company?.name}
-                  required
-                />
+                <Input id="name" name="name" defaultValue={company?.name} required />
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -167,10 +196,16 @@ export function CompanyForm({ company, organizations, showOrgSelect }: Props) {
 
               <div className="space-y-2">
                 <Label htmlFor="address">주소</Label>
+                <Input id="address" name="address" defaultValue={company?.address || ""} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="move_in_date">최초 입주일</Label>
                 <Input
-                  id="address"
-                  name="address"
-                  defaultValue={company?.address || ""}
+                  id="move_in_date"
+                  name="move_in_date"
+                  type="date"
+                  defaultValue={company?.move_in_date || ""}
                 />
               </div>
             </div>
@@ -178,7 +213,7 @@ export function CompanyForm({ company, organizations, showOrgSelect }: Props) {
 
           <Separator />
 
-          {/* === 2. 대표자 및 연락처 === */}
+          {/* === 2. 대표자 연락처 === */}
           <div>
             <h3 className="text-sm font-semibold text-muted-foreground mb-3">대표자 연락처</h3>
             <div className="grid gap-4 md:grid-cols-2">
@@ -205,59 +240,121 @@ export function CompanyForm({ company, organizations, showOrgSelect }: Props) {
 
           <Separator />
 
-          {/* === 3. 실무담당자 === */}
+          {/* === 3. 실무/행정 담당자 === */}
           <div>
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3">실무/행정 담당자</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-muted-foreground">실무/행정 담당자</h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addContact}
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                담당자 추가
+              </Button>
+            </div>
+
+            {/* 기본 담당자 */}
             <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="contact_name">담당자명</Label>
-                  <Input
-                    id="contact_name"
-                    name="contact_name"
-                    defaultValue={company?.contact_name || ""}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contact_phone">담당자 연락처</Label>
-                  <Input
-                    id="contact_phone"
-                    name="contact_phone"
-                    placeholder="010-0000-0000"
-                    defaultValue={company?.contact_phone || ""}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contact_email">담당자 이메일</Label>
-                  <Input
-                    id="contact_email"
-                    name="contact_email"
-                    type="email"
-                    placeholder="세금계산서 수신용"
-                    defaultValue={company?.contact_email || ""}
-                  />
+              <div className="rounded-md border p-3 space-y-3">
+                <p className="text-xs font-medium text-muted-foreground">담당자 1</p>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="contact_name">담당자명</Label>
+                    <Input
+                      id="contact_name"
+                      name="contact_name"
+                      defaultValue={company?.contact_name || ""}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="contact_phone">연락처</Label>
+                    <Input
+                      id="contact_phone"
+                      name="contact_phone"
+                      placeholder="010-0000-0000"
+                      defaultValue={company?.contact_phone || ""}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="contact_email">이메일</Label>
+                    <Input
+                      id="contact_email"
+                      name="contact_email"
+                      type="email"
+                      placeholder="세금계산서 수신용"
+                      defaultValue={company?.contact_email || ""}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="office_phone">사무실 전화</Label>
-                  <Input
-                    id="office_phone"
-                    name="office_phone"
-                    placeholder="055-000-0000"
-                    defaultValue={company?.office_phone || ""}
-                  />
+              {/* 추가 담당자 */}
+              {extraContacts.map((contact, index) => (
+                <div key={index} className="rounded-md border p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      담당자 {index + 2}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-destructive hover:text-destructive"
+                      onClick={() => removeContact(index)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="space-y-1">
+                      <Label>담당자명</Label>
+                      <Input
+                        value={contact.name}
+                        onChange={(e) => updateContact(index, "name", e.target.value)}
+                        placeholder="이름"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>연락처</Label>
+                      <Input
+                        value={contact.phone}
+                        onChange={(e) => updateContact(index, "phone", e.target.value)}
+                        placeholder="010-0000-0000"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>이메일</Label>
+                      <Input
+                        value={contact.email}
+                        onChange={(e) => updateContact(index, "email", e.target.value)}
+                        type="email"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fax">팩스</Label>
-                  <Input
-                    id="fax"
-                    name="fax"
-                    placeholder="055-000-0000"
-                    defaultValue={company?.fax || ""}
-                  />
-                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="office_phone">사무실 전화</Label>
+                <Input
+                  id="office_phone"
+                  name="office_phone"
+                  placeholder="055-000-0000"
+                  defaultValue={company?.office_phone || ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fax">팩스</Label>
+                <Input
+                  id="fax"
+                  name="fax"
+                  placeholder="055-000-0000"
+                  defaultValue={company?.fax || ""}
+                />
               </div>
             </div>
           </div>
@@ -291,6 +388,66 @@ export function CompanyForm({ company, organizations, showOrgSelect }: Props) {
               </div>
             </div>
           </div>
+
+          {/* === 5. 계약 정보 (신규 등록 시만) === */}
+          {!company && spaces && spaces.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">계약 정보 (선택사항)</h3>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={createContract}
+                      onChange={(e) => setCreateContract(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    계약 동시 등록
+                  </label>
+                </div>
+                {createContract && (
+                  <div className="space-y-4 rounded-md border p-4">
+                    <div className="space-y-2">
+                      <Label>입주 호실</Label>
+                      <Select name="contract_space_id">
+                        <SelectTrigger>
+                          <SelectValue placeholder="호실 선택 (공실만 표시)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vacantSpaces.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name} ({s.area}m²)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="contract_start_date">계약 시작일</Label>
+                        <Input id="contract_start_date" name="contract_start_date" type="date" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="contract_end_date">계약 종료일</Label>
+                        <Input id="contract_end_date" name="contract_end_date" type="date" />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="contract_rent_amount">월 임대료 (원)</Label>
+                        <Input id="contract_rent_amount" name="contract_rent_amount" type="number" placeholder="0" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="contract_deposit">보증금 (원)</Label>
+                        <Input id="contract_deposit" name="contract_deposit" type="number" placeholder="0" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* === 상태 및 졸업 (수정 시만) === */}
           {company && (
@@ -345,11 +502,7 @@ export function CompanyForm({ company, organizations, showOrgSelect }: Props) {
             <Button type="submit" disabled={loading}>
               {loading ? "저장 중..." : "저장"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.back()}
-            >
+            <Button type="button" variant="outline" onClick={() => router.back()}>
               취소
             </Button>
           </div>

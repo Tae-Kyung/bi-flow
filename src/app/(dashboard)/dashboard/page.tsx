@@ -104,7 +104,7 @@ export default async function DashboardPage() {
   // === 최근 퇴거 ===
   const recentMoveOutsQuery = supabase
     .from("move_outs")
-    .select("id, status, request_date, completed_at, company:companies(name)")
+    .select("id, status, request_date, exit_date, completed_at, company:companies(name)")
     .order("created_at", { ascending: false })
     .limit(5);
   if (orgFilter) recentMoveOutsQuery.eq("org_id", orgFilter);
@@ -348,7 +348,7 @@ export default async function DashboardPage() {
                     <div>
                       <p className="font-medium">{mo.company?.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {mo.request_date}
+                        퇴거예정일: {mo.exit_date || "-"}
                       </p>
                     </div>
                     <Badge variant={statusVariant(mo.status)}>

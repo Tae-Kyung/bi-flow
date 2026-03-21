@@ -139,3 +139,23 @@ export async function updateSpace(id: string, formData: FormData) {
   revalidatePath("/spaces");
   revalidatePath(`/spaces/${id}`);
 }
+
+export async function deleteSpace(id: string) {
+  await requireAuth();
+  const supabase = await createClient();
+
+  // 입주 중인 호실은 삭제 불가
+  const { data: space } = await supabase
+    .from("spaces")
+    .select("status, name")
+    .eq("id", id)
+    .single();
+
+  if (space?.status === "occupied") {
+    throw new Error(`${space.name} 호실은 현재 입주 중으로 삭제할 수 없습니다.`);
+  }
+
+  const { error } = await supabase.from("spaces").delete().eq("id", id);
+  if (error) throw error;
+  revalidatePath("/spaces");
+}

@@ -103,6 +103,9 @@ export interface Company {
   fax: string | null;
   certification_expiry: string | null;
   notes: string | null;
+  // 입주 및 추가 담당자
+  move_in_date: string | null;
+  extra_contacts: { name: string; phone: string; email: string }[] | null;
   // 졸업 관련
   graduation_notes: string | null;
   graduated_at: string | null;

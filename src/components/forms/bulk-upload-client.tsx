@@ -53,6 +53,11 @@ const DB_TO_KOREAN: Record<string, string> = {
   phone: "연락처",
   email: "이메일",
   address: "주소",
+  space_name: "입주호실",
+  move_in_date: "최초입주일",
+  contract_start_date: "계약시작일",
+  contract_end_date: "계약만료일",
+  contact_name: "담당자명",
 };
 
 // Preview table에 표시할 주요 컬럼
@@ -61,9 +66,11 @@ const DATA_COLUMNS = [
   "biz_number",
   "corporate_type",
   "representative",
-  "founding_date",
-  "business_description",
-  "main_products",
+  "space_name",
+  "move_in_date",
+  "contract_start_date",
+  "contract_end_date",
+  "contact_name",
   "phone",
   "email",
   "address",
@@ -103,9 +110,13 @@ export function BulkUploadClient({
       TEMPLATE_COLUMNS,
       ...TEMPLATE_SAMPLE_DATA,
     ]);
-    // Set column widths
     ws["!cols"] = TEMPLATE_COLUMNS.map((col) => ({
-      wch: col === "주소" ? 30 : col === "주요사업내용" ? 25 : col === "이메일" || col === "담당자 이메일" || col === "홈페이지" ? 28 : 16,
+      wch:
+        col === "주소" || col === "주요사업내용"
+          ? 30
+          : col.includes("이메일") || col === "홈페이지"
+          ? 28
+          : 16,
     }));
     XLSX.utils.book_append_sheet(wb, ws, "기업목록");
     XLSX.writeFile(wb, "기업_일괄등록_템플릿.xlsx");
@@ -136,9 +147,13 @@ export function BulkUploadClient({
 
       try {
         const buffer = await file.arrayBuffer();
-        const wb = XLSX.read(buffer, { type: "array" });
+        // cellDates: true → 날짜 셀을 JS Date 객체로 파싱 (날짜 오류 방지)
+        const wb = XLSX.read(buffer, { type: "array", cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+          raw: false,
+          defval: "",
+        });
 
         if (jsonData.length === 0) {
           toast.error("파일에 데이터가 없습니다.");
@@ -161,7 +176,7 @@ export function BulkUploadClient({
           const { parsed: validData, errors } = validateRow(mapped);
           const hasErrors = Object.keys(errors).length > 0;
           return {
-            rowNumber: i + 2, // Excel rows start at 1, +1 for header
+            rowNumber: i + 2,
             data: mapped,
             parsed: validData,
             errors,
@@ -187,7 +202,7 @@ export function BulkUploadClient({
         setRows(parsed);
         setStep("preview");
       } catch {
-        toast.error("파일을 읽는 중 오류가 발생했습니다.");
+        toast.error("파일을 읽는 중 오류가 발생했습니다. 템플릿 양식을 확인해주세요.");
       } finally {
         setLoading(false);
       }
@@ -200,7 +215,6 @@ export function BulkUploadClient({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) handleFile(file);
-      // Reset input so same file can be re-selected
       e.target.value = "";
     },
     [handleFile]
@@ -263,7 +277,11 @@ export function BulkUploadClient({
     setLoading(true);
     try {
       const result = await bulkCreateCompanies(effectiveOrgId, toInsert);
-      toast.success(`${result.inserted}건의 기업이 등록되었습니다.`);
+      if (result.contracted > 0) {
+        toast.success(`${result.inserted}건의 기업이 등록되었습니다. (계약 ${result.contracted}건 자동 생성)`);
+      } else {
+        toast.success(`${result.inserted}건의 기업이 등록되었습니다.`);
+      }
       router.push("/companies");
     } catch (err) {
       toast.error(
@@ -308,17 +326,21 @@ export function BulkUploadClient({
             )}
 
             {/* Template download */}
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={handleDownloadTemplate}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                템플릿 다운로드
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Excel 템플릿을 다운로드하여 기업 정보를 입력하세요
-              </span>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <Button variant="outline" onClick={handleDownloadTemplate}>
+                  <Download className="mr-2 h-4 w-4" />
+                  템플릿 다운로드
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Excel 템플릿을 다운로드하여 기업 정보를 입력하세요
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground pl-1">
+                • 필수: 기업명, 사업자등록번호, 대표자명<br />
+                • 입주호실을 입력하면 계약시작일 / 계약만료일과 함께 계약이 자동 생성됩니다.<br />
+                • 담당자2, 담당자3을 입력하면 추가 담당자로 등록됩니다.
+              </p>
             </div>
 
             {/* File upload area */}
@@ -362,11 +384,7 @@ export function BulkUploadClient({
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleReset}
-                  >
+                  <Button variant="ghost" size="sm" onClick={handleReset}>
                     <ArrowLeft className="mr-1 h-4 w-4" />
                     다시 업로드
                   </Button>
@@ -376,13 +394,9 @@ export function BulkUploadClient({
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Badge variant="default">
-                    유효 {validRows.length}건
-                  </Badge>
+                  <Badge variant="default">유효 {validRows.length}건</Badge>
                   {errorRows.length > 0 && (
-                    <Badge variant="destructive">
-                      오류 {errorRows.length}건
-                    </Badge>
+                    <Badge variant="destructive">오류 {errorRows.length}건</Badge>
                   )}
                 </div>
               </div>
@@ -410,9 +424,7 @@ export function BulkUploadClient({
                       </TableHead>
                       <TableHead className="w-14">행</TableHead>
                       {DATA_COLUMNS.map((col) => (
-                        <TableHead key={col}>
-                          {DB_TO_KOREAN[col]}
-                        </TableHead>
+                        <TableHead key={col}>{DB_TO_KOREAN[col]}</TableHead>
                       ))}
                       <TableHead className="w-24">상태</TableHead>
                     </TableRow>
@@ -424,9 +436,7 @@ export function BulkUploadClient({
                       return (
                         <TableRow
                           key={row.rowNumber}
-                          className={
-                            hasError ? "bg-destructive/5" : ""
-                          }
+                          className={hasError ? "bg-destructive/5" : ""}
                         >
                           <TableCell>
                             <input
@@ -444,11 +454,7 @@ export function BulkUploadClient({
                             <TableCell key={col}>
                               <div>
                                 <span
-                                  className={
-                                    row.errors[col]
-                                      ? "text-destructive"
-                                      : ""
-                                  }
+                                  className={row.errors[col] ? "text-destructive" : ""}
                                 >
                                   {row.data[col] || "-"}
                                 </span>
@@ -491,9 +497,7 @@ export function BulkUploadClient({
               onClick={handleSubmit}
               disabled={loading || selectedRows.length === 0}
             >
-              {loading
-                ? "등록 중..."
-                : `${selectedRows.length}건 등록`}
+              {loading ? "등록 중..." : `${selectedRows.length}건 등록`}
             </Button>
           </div>
         </>
