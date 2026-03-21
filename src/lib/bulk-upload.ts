@@ -176,9 +176,37 @@ function formatValue(value: unknown): string {
 }
 
 /**
+ * 이메일 셀에서 첫 번째 유효한 이메일 주소를 추출합니다.
+ * 처리 패턴:
+ *   "이름:email@x.com"         → "email@x.com"
+ *   "email@x.com(설명)"        → "email@x.com"
+ *   "email1@x.com,email2@x.com"→ "email1@x.com"
+ *   "email1\nemail2"           → "email1"
+ */
+function extractEmail(raw: string): string {
+  // 줄바꿈/쉼표/세미콜론으로 분리 후 첫 번째 토큰 사용
+  const candidates = raw.split(/[\n\r,;]+/).map((s) => s.trim()).filter(Boolean);
+  for (const candidate of candidates) {
+    // "이름:email" 형식 → 콜론 뒤를 사용
+    const afterColon = candidate.includes(":") ? candidate.split(":").pop()!.trim() : candidate;
+    // 괄호 안 설명 제거
+    const cleaned = afterColon.replace(/\(.*?\)/g, "").trim();
+    // 이메일 형식 검사
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)) {
+      return cleaned;
+    }
+  }
+  return "";
+}
+
+/**
  * Map raw row object (Korean headers) to DB column names.
  * Returns null values as empty strings.
  */
+const EMAIL_COLUMNS = new Set([
+  "email", "contact_email", "contact_email_2", "contact_email_3",
+]);
+
 export function mapHeaders(
   row: Record<string, unknown>
 ): Record<string, string> {
@@ -188,7 +216,8 @@ export function mapHeaders(
     const trimmedHeader = header.trim().replace(/^\uFEFF/, "");
     const dbCol = HEADER_MAP[trimmedHeader];
     if (dbCol) {
-      mapped[dbCol] = formatValue(value);
+      const strValue = formatValue(value);
+      mapped[dbCol] = EMAIL_COLUMNS.has(dbCol) ? extractEmail(strValue) : strValue;
     }
   }
   // Map Korean corporate_type values to DB values
