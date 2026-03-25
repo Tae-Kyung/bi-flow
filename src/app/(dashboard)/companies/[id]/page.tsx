@@ -31,7 +31,9 @@ export default async function CompanyDetailPage({
     getSpaces(),
   ]);
 
-  const vacantSpaces = (allSpaces as Space[]).filter((s) => s.status === "vacant");
+  const vacantSpaces = (allSpaces as Space[])
+    .filter((s) => s.status === "vacant")
+    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 
   const canUpload = isAdmin || profile.role === "tenant";
   const canDelete = isAdmin;
