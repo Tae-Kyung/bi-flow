@@ -69,12 +69,14 @@ export default async function DashboardPage() {
   const { count: terminatedCompanyCount } = await terminatedQuery;
 
   // === 계약 현황 ===
-  const activeContractQuery = supabase
+  // 기업당 1개의 활성 계약만 카운트 (company_id 기준 중복 제거)
+  let activeContractQuery = supabase
     .from("contracts")
-    .select("*", { count: "exact", head: true })
+    .select("company_id")
     .eq("status", "active");
-  if (orgFilter) activeContractQuery.eq("org_id", orgFilter);
-  const { count: activeContractCount } = await activeContractQuery;
+  if (orgFilter) activeContractQuery = activeContractQuery.eq("org_id", orgFilter);
+  const { data: activeContractRows } = await activeContractQuery;
+  const activeContractCount = new Set(activeContractRows?.map((r) => r.company_id)).size;
 
   // 30일 내 만료 예정 계약
   const today = new Date().toISOString().split("T")[0];
