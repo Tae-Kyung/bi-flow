@@ -2,7 +2,7 @@ import { requireAuth } from "@/lib/auth";
 import { getCompany } from "@/actions/companies";
 import { getOrganizations } from "@/actions/organizations";
 import { getDocuments } from "@/actions/documents";
-import { getActiveContractByCompany } from "@/actions/contracts";
+import { getActiveContractsByCompany } from "@/actions/contracts";
 import { getSpaces } from "@/actions/spaces";
 import { CompanyForm } from "@/components/forms/company-form";
 import { DocumentUpload } from "@/components/forms/document-upload";
@@ -25,13 +25,13 @@ export default async function CompanyDetailPage({
     organizations = (await getOrganizations()) as Organization[];
   }
 
-  const [documents, activeContract, allSpaces] = await Promise.all([
+  const [documents, activeContracts, allSpaces] = await Promise.all([
     getDocuments(id),
-    getActiveContractByCompany(id),
+    getActiveContractsByCompany(id),
     getSpaces(),
   ]);
 
-  // 공실만 + 현재 입주 호실은 SpaceMappingCard 내부에서 별도 처리
+  // 공실만 필터 (현재 배정된 호실은 SpaceMappingCard 내부에서 각 계약별로 처리)
   const vacantSpaces = (allSpaces as Space[]).filter((s) => s.status === "vacant");
 
   const canUpload = isAdmin || profile.role === "tenant";
@@ -45,7 +45,7 @@ export default async function CompanyDetailPage({
       <SpaceMappingCard
         companyId={id}
         orgId={company.org_id}
-        activeContract={activeContract as any}
+        activeContracts={activeContracts as any}
         availableSpaces={vacantSpaces}
         canEdit={isAdmin}
       />

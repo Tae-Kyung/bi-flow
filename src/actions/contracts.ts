@@ -39,6 +39,17 @@ export async function getActiveContractByCompany(companyId: string) {
   return data;
 }
 
+export async function getActiveContractsByCompany(companyId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("contracts")
+    .select("id, start_date, end_date, rent_amount, deposit, space:spaces(id, name, area, floor)")
+    .eq("company_id", companyId)
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
+  return data ?? [];
+}
+
 export async function assignCompanySpace(
   companyId: string,
   orgId: string,
@@ -88,6 +99,101 @@ export async function assignCompanySpace(
 
   // 새 호실 → 입주
   await supabase.from("spaces").update({ status: "occupied" }).eq("id", spaceId);
+
+  revalidatePath(`/companies/${companyId}`);
+  revalidatePath("/contracts");
+  revalidatePath("/spaces");
+}
+
+export async function addCompanySpace(
+  companyId: string,
+  orgId: string,
+  spaceId: string,
+  startDate: string,
+  endDate: string,
+  rentAmount: number,
+  deposit: number
+) {
+  await requireAuth();
+  const supabase = await createClient();
+
+  // 호실이 이미 다른 계약에서 active 상태인지 확인
+  const { data: spaceCheck } = await supabase
+    .from("spaces")
+    .select("status")
+    .eq("id", spaceId)
+    .single();
+  if (spaceCheck?.status === "occupied") throw new Error("이미 입주 중인 호실입니다.");
+
+  const { error } = await supabase.from("contracts").insert({
+    org_id: orgId,
+    company_id: companyId,
+    space_id: spaceId,
+    start_date: startDate,
+    end_date: endDate,
+    rent_amount: rentAmount,
+    deposit,
+    status: "active",
+  });
+  if (error) throw new Error(error.message);
+
+  await supabase.from("spaces").update({ status: "occupied" }).eq("id", spaceId);
+
+  revalidatePath(`/companies/${companyId}`);
+  revalidatePath("/contracts");
+  revalidatePath("/spaces");
+}
+
+export async function updateCompanySpaceContract(
+  contractId: string,
+  companyId: string,
+  oldSpaceId: string,
+  newSpaceId: string,
+  startDate: string,
+  endDate: string,
+  rentAmount: number,
+  deposit: number
+) {
+  await requireAuth();
+  const supabase = await createClient();
+
+  // 호실이 변경되는 경우, 새 호실이 다른 기업에서 사용 중인지 확인
+  if (oldSpaceId !== newSpaceId) {
+    const { data: spaceCheck } = await supabase
+      .from("spaces")
+      .select("status")
+      .eq("id", newSpaceId)
+      .single();
+    if (spaceCheck?.status === "occupied") throw new Error("이미 입주 중인 호실입니다.");
+  }
+
+  const { error } = await supabase
+    .from("contracts")
+    .update({ space_id: newSpaceId, start_date: startDate, end_date: endDate, rent_amount: rentAmount, deposit })
+    .eq("id", contractId);
+  if (error) throw new Error(error.message);
+
+  if (oldSpaceId !== newSpaceId) {
+    await supabase.from("spaces").update({ status: "vacant" }).eq("id", oldSpaceId);
+    await supabase.from("spaces").update({ status: "occupied" }).eq("id", newSpaceId);
+  }
+
+  revalidatePath(`/companies/${companyId}`);
+  revalidatePath("/contracts");
+  revalidatePath("/spaces");
+}
+
+export async function removeCompanySpace(contractId: string, spaceId: string, companyId: string) {
+  await requireAuth();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("contracts")
+    .update({ status: "terminated" })
+    .eq("id", contractId);
+  if (error) throw new Error(error.message);
+
+  await supabase.from("spaces").update({ status: "vacant" }).eq("id", spaceId);
 
   revalidatePath(`/companies/${companyId}`);
   revalidatePath("/contracts");
