@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Plus, Upload } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Plus, Upload } from "lucide-react";
 import { SpaceDeleteButton } from "@/components/forms/space-delete-button";
 
 const statusLabels: Record<string, string> = {
@@ -24,13 +24,30 @@ const statusVariants: Record<string, "default" | "secondary"> = {
   occupied: "default",
 };
 
-export default async function SpacesPage() {
+export default async function SpacesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string; order?: string }>;
+}) {
   const profile = await requireAuth();
-  const spaces = await getSpaces();
+  const { sort, order } = await searchParams;
+  const spaces = await getSpaces(undefined, sort, order);
 
   const isSuperAdmin = profile.role === "super_admin";
   const canCreate = isSuperAdmin || profile.role === "org_admin";
   const colCount = isSuperAdmin ? 8 : 7;
+
+  function sortHref(field: string) {
+    const nextOrder = sort === field && order === "asc" ? "desc" : "asc";
+    return `/spaces?sort=${field}&order=${nextOrder}`;
+  }
+
+  function SortIcon({ field }: { field: string }) {
+    if (sort !== field) return <ChevronsUpDown className="ml-1 inline h-3 w-3 text-muted-foreground" />;
+    return order === "asc"
+      ? <ChevronUp className="ml-1 inline h-3 w-3" />
+      : <ChevronDown className="ml-1 inline h-3 w-3" />;
+  }
 
   return (
     <div className="space-y-6">
@@ -58,12 +75,20 @@ export default async function SpacesPage() {
         <TableHeader>
           <TableRow>
             {isSuperAdmin && <TableHead>기관</TableHead>}
-            <TableHead>호실명</TableHead>
+            <TableHead>
+              <Link href={sortHref("name")} className="flex items-center hover:text-foreground">
+                호실명<SortIcon field="name" />
+              </Link>
+            </TableHead>
             <TableHead>층</TableHead>
             <TableHead className="text-right">전용면적 (m²)</TableHead>
             <TableHead>설명</TableHead>
             <TableHead>상태</TableHead>
-            <TableHead>입주기업</TableHead>
+            <TableHead>
+              <Link href={sortHref("company")} className="flex items-center hover:text-foreground">
+                입주기업<SortIcon field="company" />
+              </Link>
+            </TableHead>
             <TableHead className="text-right">작업</TableHead>
           </TableRow>
         </TableHeader>

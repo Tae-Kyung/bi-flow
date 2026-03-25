@@ -4,14 +4,19 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-export async function getSpaces(orgId?: string) {
+export async function getSpaces(orgId?: string, sortBy?: string, sortOrder?: string) {
   const profile = await requireAuth();
   const supabase = await createClient();
+
+  const ascending = sortOrder !== "desc";
+
+  // 호실명은 DB 레벨 정렬, 입주기업은 조인 후 메모리 정렬
+  const dbSortColumn = sortBy === "name" ? "name" : "created_at";
 
   let query = supabase
     .from("spaces")
     .select("*, organization:organizations(name), contracts:contracts(id, company:companies(id, name), status)")
-    .order("created_at", { ascending: true });
+    .order(dbSortColumn, { ascending: sortBy === "name" ? ascending : true });
 
   const filterOrgId = orgId || (profile.role !== "super_admin" ? profile.org_id : null);
   if (filterOrgId) query = query.eq("org_id", filterOrgId);
@@ -20,7 +25,7 @@ export async function getSpaces(orgId?: string) {
   if (error) throw error;
 
   // 각 space에 active 계약의 입주기업 정보 추가
-  return (data || []).map((space: any) => {
+  let result = (data || []).map((space: any) => {
     const activeContract = space.contracts?.find((c: any) => c.status === "active");
     return {
       ...space,
@@ -28,6 +33,19 @@ export async function getSpaces(orgId?: string) {
       contracts: undefined,
     };
   });
+
+  // 입주기업명 정렬 (메모리)
+  if (sortBy === "company") {
+    result = result.sort((a: any, b: any) => {
+      const nameA = a.tenant_company?.name ?? "";
+      const nameB = b.tenant_company?.name ?? "";
+      return ascending
+        ? nameA.localeCompare(nameB, "ko")
+        : nameB.localeCompare(nameA, "ko");
+    });
+  }
+
+  return result;
 }
 
 export async function getSpace(id: string) {
