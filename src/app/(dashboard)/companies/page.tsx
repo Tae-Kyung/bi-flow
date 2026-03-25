@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Plus, Upload } from "lucide-react";
+import { DeleteCompanyButton } from "@/components/companies/delete-company-button";
 
 const statusLabels: Record<string, string> = {
   active: "활동",
@@ -160,11 +161,19 @@ export default async function CompaniesPage({
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Link href={`/companies/${company.id}`}>
-                    <Button variant="ghost" size="icon">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </Link>
+                  <div className="flex items-center justify-end gap-1">
+                    <Link href={`/companies/${company.id}`}>
+                      <Button variant="ghost" size="icon">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                    {isAdmin && (
+                      <DeleteCompanyButton
+                        companyId={company.id}
+                        companyName={company.name}
+                      />
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

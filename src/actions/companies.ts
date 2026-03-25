@@ -371,3 +371,34 @@ export async function updateCompany(id: string, formData: FormData) {
   revalidatePath("/companies");
   revalidatePath(`/companies/${id}`);
 }
+
+export async function deleteCompany(companyId: string) {
+  const profile = await requireAuth();
+  if (profile.role !== "super_admin" && profile.role !== "org_admin") {
+    throw new Error("권한이 없습니다.");
+  }
+
+  const supabase = await createClient();
+
+  // active 계약에 연결된 호실을 먼저 vacant으로 변경
+  const { data: activeContracts } = await supabase
+    .from("contracts")
+    .select("space_id")
+    .eq("company_id", companyId)
+    .eq("status", "active");
+
+  if (activeContracts && activeContracts.length > 0) {
+    const spaceIds = activeContracts.map((c) => c.space_id).filter(Boolean);
+    if (spaceIds.length > 0) {
+      await supabase.from("spaces").update({ status: "vacant" }).in("id", spaceIds);
+    }
+  }
+
+  // 기업 삭제 (contracts, documents, invoices 등은 CASCADE로 자동 삭제)
+  const { error } = await supabase.from("companies").delete().eq("id", companyId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/companies");
+  revalidatePath("/contracts");
+  revalidatePath("/spaces");
+}
