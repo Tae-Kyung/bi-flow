@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Plus, Upload } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Plus, Upload } from "lucide-react";
 import { DeleteCompanyButton } from "@/components/companies/delete-company-button";
 
 const statusLabels: Record<string, string> = {
@@ -42,17 +42,33 @@ const tabs = [
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; sort?: string; order?: string }>;
 }) {
   const profile = await requireAuth();
-  const { status } = await searchParams;
-  const companies = await getCompanies(undefined, status);
+  const { status, sort, order } = await searchParams;
+  const companies = await getCompanies(undefined, status, sort, order);
   const counts = await getCompanyStatusCounts();
 
   const isSuperAdmin = profile.role === "super_admin";
   const canCreate = isSuperAdmin || profile.role === "org_admin";
   const isAdmin = isSuperAdmin || profile.role === "org_admin";
   const colCount = isSuperAdmin ? 11 : 10;
+
+  function sortHref(field: string) {
+    const nextOrder = sort === field && order === "asc" ? "desc" : "asc";
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    params.set("sort", field);
+    params.set("order", nextOrder);
+    return `/companies?${params.toString()}`;
+  }
+
+  function SortIcon({ field }: { field: string }) {
+    if (sort !== field) return <ChevronsUpDown className="ml-1 inline h-3 w-3 text-muted-foreground" />;
+    return order === "asc"
+      ? <ChevronUp className="ml-1 inline h-3 w-3" />
+      : <ChevronDown className="ml-1 inline h-3 w-3" />;
+  }
 
   return (
     <div className="space-y-6">
@@ -104,10 +120,18 @@ export default async function CompaniesPage({
           <TableHeader>
             <TableRow>
               {isSuperAdmin && <TableHead>기관</TableHead>}
-              <TableHead>기업명</TableHead>
+              <TableHead>
+                <Link href={sortHref("name")} className="flex items-center hover:text-foreground">
+                  기업명<SortIcon field="name" />
+                </Link>
+              </TableHead>
               <TableHead>구분</TableHead>
               <TableHead>사업자등록번호</TableHead>
-              <TableHead>대표자</TableHead>
+              <TableHead>
+                <Link href={sortHref("representative")} className="flex items-center hover:text-foreground">
+                  대표자<SortIcon field="representative" />
+                </Link>
+              </TableHead>
               <TableHead>연락처</TableHead>
               <TableHead>설립일</TableHead>
               <TableHead>주요 사업내용</TableHead>

@@ -5,14 +5,23 @@ import { requireAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import type { CompanyStatus } from "@/types";
 
-export async function getCompanies(orgId?: string, status?: string) {
+export async function getCompanies(
+  orgId?: string,
+  status?: string,
+  sortBy?: string,
+  sortOrder?: string
+) {
   const profile = await requireAuth();
   const supabase = await createClient();
+
+  const allowedSortFields = ["name", "representative", "created_at"];
+  const column = allowedSortFields.includes(sortBy ?? "") ? sortBy! : "created_at";
+  const ascending = sortOrder !== "desc";
 
   let query = supabase
     .from("companies")
     .select("*, organization:organizations(name)")
-    .order("created_at", { ascending: true });
+    .order(column, { ascending });
 
   const filterOrgId = orgId || (profile.role !== "super_admin" ? profile.org_id : null);
   if (filterOrgId) query = query.eq("org_id", filterOrgId);
