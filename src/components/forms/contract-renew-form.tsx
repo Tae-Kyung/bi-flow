@@ -50,7 +50,9 @@ export function ContractRenewForm({ contract }: Props) {
               </div>
               <div>
                 <span className="text-muted-foreground">호실: </span>
-                <span className="font-medium">{contract.space?.name}</span>
+                <span className="font-medium">
+                  {(contract.contract_spaces as any[])?.map((cs: any) => cs.space?.name).filter(Boolean).join(", ") || "-"}
+                </span>
               </div>
               <div>
                 <span className="text-muted-foreground">계약기간: </span>

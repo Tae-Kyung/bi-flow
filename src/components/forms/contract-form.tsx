@@ -36,7 +36,9 @@ export function ContractForm({ contract, companies, spaces, organizations, showO
     }
   }
 
-  const vacantSpaces = spaces.filter((s) => s.status === "vacant" || s.id === contract?.space_id);
+  const vacantSpaces = spaces.filter((s) => s.status === "vacant");
+  const contractSpaceNames = (contract as any)?.contract_spaces
+    ?.map((cs: any) => cs.space?.name).filter(Boolean).join(", ");
 
   return (
     <Card>
@@ -70,16 +72,23 @@ export function ContractForm({ contract, companies, spaces, organizations, showO
             </div>
             <div className="space-y-2">
               <Label>호실</Label>
-              <Select name="space_id" defaultValue={contract?.space_id} disabled={!!contract}>
-                <SelectTrigger><SelectValue placeholder="호실 선택" /></SelectTrigger>
-                <SelectContent>
-                  {vacantSpaces.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name} ({s.area}m²) {s.status === "occupied" ? "[현재]" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {contract ? (
+                <div className="flex h-10 w-full items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                  {contractSpaceNames || "-"}
+                  <span className="ml-1 text-xs">(기업 수정 페이지에서 변경)</span>
+                </div>
+              ) : (
+                <Select name="space_id">
+                  <SelectTrigger><SelectValue placeholder="호실 선택" /></SelectTrigger>
+                  <SelectContent>
+                    {vacantSpaces.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name} ({s.area}m²)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">

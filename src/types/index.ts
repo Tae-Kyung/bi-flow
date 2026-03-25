@@ -114,10 +114,17 @@ export interface Company {
   organization?: Organization;
 }
 
+export interface ContractSpace {
+  id: string;
+  contract_id: string;
+  space_id: string;
+  space?: Space;
+}
+
 export interface Contract {
   id: string;
   company_id: string;
-  space_id: string;
+  space_id?: string | null;
   org_id: string;
   start_date: string;
   end_date: string;
@@ -128,7 +135,7 @@ export interface Contract {
   created_at: string;
   updated_at: string;
   company?: Company;
-  space?: Space;
+  contract_spaces?: ContractSpace[];
 }
 
 export interface Document {

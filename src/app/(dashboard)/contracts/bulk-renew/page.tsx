@@ -11,7 +11,7 @@ export default async function ContractBulkRenewPage() {
     .map((c) => ({
       id: c.id,
       companyName: c.company?.name || "-",
-      spaceName: c.space?.name || "-",
+      spaceName: (c.contract_spaces as any[])?.map((cs: any) => cs.space?.name).filter(Boolean).join(", ") || "-",
       startDate: c.start_date,
       endDate: c.end_date,
     }));

@@ -69,7 +69,9 @@ export default async function ContractsPage() {
                     {c.company?.name}
                   </Link>
                 </TableCell>
-                <TableCell>{c.space?.name || "-"}</TableCell>
+                <TableCell>
+                  {(c.contract_spaces as any[])?.map((cs: any) => cs.space?.name).filter(Boolean).join(", ") || "-"}
+                </TableCell>
                 <TableCell className="text-sm">
                   {c.start_date} ~ {c.end_date}
                 </TableCell>

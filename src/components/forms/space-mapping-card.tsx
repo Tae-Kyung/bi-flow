@@ -15,9 +15,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { addCompanySpace, updateCompanySpaceContract, removeCompanySpace } from "@/actions/contracts";
+import {
+  createContractWithSpace,
+  addSpaceToContract,
+  removeSpaceFromContract,
+  updateContractDetails,
+} from "@/actions/contracts";
 import { DoorOpen, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { Space } from "@/types";
+
+interface ContractSpace {
+  id: string;
+  space: { id: string; name: string; area: number; floor: string | null } | null;
+}
 
 interface ActiveContract {
   id: string;
@@ -25,158 +35,145 @@ interface ActiveContract {
   end_date: string;
   rent_amount: number;
   deposit: number;
-  space: { id: string; name: string; area: number; floor: string | null } | null;
+  contract_spaces: ContractSpace[];
 }
 
 interface Props {
   companyId: string;
   orgId: string;
-  activeContracts: ActiveContract[];
-  availableSpaces: Space[]; // vacant 호실 목록
+  activeContract: ActiveContract | null;
+  availableSpaces: Space[];
   canEdit: boolean;
-}
-
-interface SpaceFormState {
-  spaceId: string;
-  startDate: string;
-  endDate: string;
-  rentAmount: string;
-  deposit: string;
-}
-
-function emptyForm(): SpaceFormState {
-  return { spaceId: "", startDate: "", endDate: "", rentAmount: "0", deposit: "0" };
-}
-
-function validateForm(form: SpaceFormState): string | null {
-  if (!form.spaceId) return "호실을 선택해주세요.";
-  if (!form.startDate || !form.endDate) return "계약 시작일과 종료일을 입력해주세요.";
-  if (form.startDate >= form.endDate) return "계약 시작일은 종료일보다 앞이어야 합니다.";
-  return null;
 }
 
 export function SpaceMappingCard({
   companyId,
   orgId,
-  activeContracts,
+  activeContract,
   availableSpaces,
   canEdit,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  // 편집 중인 계약 ID (null이면 편집 없음)
-  const [editingContractId, setEditingContractId] = useState<string | null>(null);
-  // 새 호실 추가 폼 표시 여부
-  const [addingNew, setAddingNew] = useState(false);
+  // 모드: null=보기, "edit"=계약정보 수정, "add"=호실 추가, "create"=최초 계약 생성
+  const [mode, setMode] = useState<"edit" | "add" | "create" | null>(null);
 
-  // 편집 폼 상태
-  const [editForm, setEditForm] = useState<SpaceFormState>(emptyForm());
-  // 추가 폼 상태
-  const [addForm, setAddForm] = useState<SpaceFormState>(emptyForm());
+  // 계약 정보 편집 폼
+  const [editForm, setEditForm] = useState({
+    startDate: activeContract?.start_date ?? "",
+    endDate: activeContract?.end_date ?? "",
+    rentAmount: String(activeContract?.rent_amount ?? 0),
+    deposit: String(activeContract?.deposit ?? 0),
+  });
 
-  // 이미 배정된 space_id 목록
-  const assignedSpaceIds = activeContracts
-    .map((c) => c.space?.id)
+  // 호실 추가 / 최초 생성 폼
+  const [spaceForm, setSpaceForm] = useState({
+    spaceId: "",
+    startDate: "",
+    endDate: "",
+    rentAmount: "0",
+    deposit: "0",
+  });
+
+  const assignedSpaceIds = (activeContract?.contract_spaces ?? [])
+    .map((cs) => cs.space?.id)
     .filter(Boolean) as string[];
 
-  // 추가 시 선택 가능한 호실: 이미 배정된 호실 제외한 공실
   const addableSpaces = availableSpaces.filter((s) => !assignedSpaceIds.includes(s.id));
 
-  function startEdit(contract: ActiveContract) {
-    setEditingContractId(contract.id);
+  function openEdit() {
     setEditForm({
-      spaceId: contract.space?.id ?? "",
-      startDate: contract.start_date,
-      endDate: contract.end_date,
-      rentAmount: String(contract.rent_amount),
-      deposit: String(contract.deposit),
+      startDate: activeContract?.start_date ?? "",
+      endDate: activeContract?.end_date ?? "",
+      rentAmount: String(activeContract?.rent_amount ?? 0),
+      deposit: String(activeContract?.deposit ?? 0),
     });
-    setAddingNew(false);
+    setMode("edit");
   }
 
-  function cancelEdit() {
-    setEditingContractId(null);
-    setEditForm(emptyForm());
+  function openAdd() {
+    setSpaceForm({ spaceId: "", startDate: "", endDate: "", rentAmount: "0", deposit: "0" });
+    setMode("add");
   }
 
-  function startAdd() {
-    setAddingNew(true);
-    setAddForm(emptyForm());
-    setEditingContractId(null);
+  function openCreate() {
+    setSpaceForm({ spaceId: "", startDate: "", endDate: "", rentAmount: "0", deposit: "0" });
+    setMode("create");
   }
 
-  function cancelAdd() {
-    setAddingNew(false);
-    setAddForm(emptyForm());
-  }
-
-  async function handleSaveEdit(contract: ActiveContract) {
-    const err = validateForm(editForm);
-    if (err) { toast.error(err); return; }
-
+  async function handleSaveEdit() {
+    if (!editForm.startDate || !editForm.endDate) {
+      toast.error("계약 시작일과 종료일을 입력해주세요."); return;
+    }
+    if (editForm.startDate >= editForm.endDate) {
+      toast.error("계약 시작일은 종료일보다 앞이어야 합니다."); return;
+    }
     setLoading(true);
     try {
-      await updateCompanySpaceContract(
-        contract.id,
-        companyId,
-        contract.space?.id ?? "",
-        editForm.spaceId,
-        editForm.startDate,
-        editForm.endDate,
-        Number(editForm.rentAmount) || 0,
-        Number(editForm.deposit) || 0,
+      await updateContractDetails(
+        activeContract!.id, companyId,
+        editForm.startDate, editForm.endDate,
+        Number(editForm.rentAmount) || 0, Number(editForm.deposit) || 0,
       );
-      toast.success("호실 정보가 수정되었습니다.");
-      setEditingContractId(null);
+      toast.success("계약 정보가 수정되었습니다.");
+      setMode(null);
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "저장 중 오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
-  async function handleAdd() {
-    const err = validateForm(addForm);
-    if (err) { toast.error(err); return; }
-
+  async function handleAddSpace() {
+    if (!spaceForm.spaceId) { toast.error("호실을 선택해주세요."); return; }
     setLoading(true);
     try {
-      await addCompanySpace(
-        companyId,
-        orgId,
-        addForm.spaceId,
-        addForm.startDate,
-        addForm.endDate,
-        Number(addForm.rentAmount) || 0,
-        Number(addForm.deposit) || 0,
-      );
+      await addSpaceToContract(activeContract!.id, spaceForm.spaceId, companyId);
       toast.success("호실이 추가되었습니다.");
-      setAddingNew(false);
+      setMode(null);
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "저장 중 오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
-  async function handleRemove(contract: ActiveContract) {
-    if (!contract.space) return;
-    if (!confirm(`${contract.space.name} 호실 배정을 해제하시겠습니까?`)) return;
-
+  async function handleCreate() {
+    if (!spaceForm.spaceId) { toast.error("호실을 선택해주세요."); return; }
+    if (!spaceForm.startDate || !spaceForm.endDate) {
+      toast.error("계약 시작일과 종료일을 입력해주세요."); return;
+    }
+    if (spaceForm.startDate >= spaceForm.endDate) {
+      toast.error("계약 시작일은 종료일보다 앞이어야 합니다."); return;
+    }
     setLoading(true);
     try {
-      await removeCompanySpace(contract.id, contract.space.id, companyId);
+      await createContractWithSpace(
+        companyId, orgId, spaceForm.spaceId,
+        spaceForm.startDate, spaceForm.endDate,
+        Number(spaceForm.rentAmount) || 0, Number(spaceForm.deposit) || 0,
+      );
+      toast.success("계약 및 호실 배정이 완료되었습니다.");
+      setMode(null);
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "저장 중 오류가 발생했습니다.");
+    } finally { setLoading(false); }
+  }
+
+  async function handleRemoveSpace(cs: ContractSpace) {
+    if (!cs.space) return;
+    if (!confirm(`${cs.space.name} 호실 배정을 해제하시겠습니까?`)) return;
+    setLoading(true);
+    try {
+      await removeSpaceFromContract(cs.id, cs.space.id, companyId);
       toast.success("호실 배정이 해제되었습니다.");
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
+
+  const spaceCount = activeContract?.contract_spaces.length ?? 0;
 
   return (
     <Card>
@@ -184,174 +181,209 @@ export function SpaceMappingCard({
         <CardTitle className="flex items-center gap-2 text-base">
           <DoorOpen className="h-4 w-4" />
           입주 호실
-          {activeContracts.length > 0 && (
-            <Badge variant="secondary" className="ml-1">{activeContracts.length}</Badge>
+          {spaceCount > 0 && (
+            <Badge variant="secondary" className="ml-1">{spaceCount}</Badge>
           )}
         </CardTitle>
-        {canEdit && !addingNew && editingContractId === null && (
-          <Button variant="outline" size="sm" onClick={startAdd} disabled={addableSpaces.length === 0}>
-            <Plus className="h-3 w-3 mr-1" />
-            호실 추가
+        {canEdit && mode === null && activeContract && (
+          <Button variant="outline" size="sm" onClick={openEdit}>
+            <Pencil className="h-3 w-3 mr-1" />계약 수정
           </Button>
         )}
       </CardHeader>
+
       <CardContent className="space-y-4">
-        {/* 배정된 호실 목록 */}
-        {activeContracts.length === 0 && !addingNew && (
-          <p className="text-sm text-muted-foreground">배정된 호실이 없습니다.</p>
+        {/* ── 활성 계약 없음 ── */}
+        {!activeContract && mode === null && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">배정된 계약이 없습니다.</p>
+            {canEdit && (
+              <Button variant="outline" size="sm" onClick={openCreate} disabled={availableSpaces.length === 0}>
+                <Plus className="h-3 w-3 mr-1" />계약 및 호실 배정
+              </Button>
+            )}
+          </div>
         )}
 
-        {activeContracts.map((contract) => {
-          const isEditing = editingContractId === contract.id;
-          // 편집 시 선택 가능한 호실: 이 계약의 현재 호실 + 다른 기업에 배정 안 된 공실
-          const editableSpaces = [
-            ...(contract.space
-              ? [{ id: contract.space.id, name: contract.space.name, area: contract.space.area, floor: contract.space.floor, status: "occupied" as const }]
-              : []),
-            ...availableSpaces.filter((s) => s.id !== contract.space?.id),
-          ];
-
-          return (
-            <div key={contract.id} className="rounded-lg border p-4 space-y-3">
-              {!isEditing ? (
-                /* 보기 모드 */
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Badge variant="default">입주 중</Badge>
-                      <span className="font-semibold text-lg">{contract.space?.name ?? "-"}</span>
-                      {contract.space?.floor && (
-                        <span className="text-sm text-muted-foreground">{contract.space.floor}층</span>
-                      )}
-                      {contract.space?.area != null && contract.space.area > 0 && (
-                        <span className="text-sm text-muted-foreground">{contract.space.area}m²</span>
-                      )}
-                    </div>
-                    {canEdit && (
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => startEdit(contract)} disabled={loading}>
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleRemove(contract)} disabled={loading} className="text-destructive hover:text-destructive">
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-muted-foreground">
-                    <div>계약기간: <span className="text-foreground">{contract.start_date} ~ {contract.end_date}</span></div>
-                    {contract.rent_amount > 0 && (
-                      <div>월 임대료: <span className="text-foreground">{contract.rent_amount.toLocaleString()}원</span></div>
-                    )}
-                    {contract.deposit > 0 && (
-                      <div>보증금: <span className="text-foreground">{contract.deposit.toLocaleString()}원</span></div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* 편집 모드 */
-                <SpaceForm
-                  form={editForm}
-                  onChange={setEditForm}
-                  spaceOptions={editableSpaces}
-                  currentSpaceId={contract.space?.id}
-                  loading={loading}
-                  onSave={() => handleSaveEdit(contract)}
-                  onCancel={cancelEdit}
-                />
-              )}
+        {/* ── 최초 계약 생성 폼 ── */}
+        {mode === "create" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">계약 및 호실 배정</span>
+              <Button variant="ghost" size="sm" onClick={() => setMode(null)} disabled={loading}><X className="h-3 w-3" /></Button>
             </div>
-          );
-        })}
-
-        {/* 새 호실 추가 폼 */}
-        {addingNew && (
-          <div className="rounded-lg border border-dashed p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">새 호실 추가</span>
-              <Button variant="ghost" size="sm" onClick={cancelAdd} disabled={loading}>
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-            <SpaceForm
-              form={addForm}
-              onChange={setAddForm}
-              spaceOptions={addableSpaces}
-              loading={loading}
-              onSave={handleAdd}
-              onCancel={cancelAdd}
+            <SpaceSelect value={spaceForm.spaceId} options={availableSpaces} onChange={(v) => setSpaceForm({ ...spaceForm, spaceId: v })} />
+            <DateFields
+              startDate={spaceForm.startDate} endDate={spaceForm.endDate}
+              onStartChange={(v) => setSpaceForm({ ...spaceForm, startDate: v })}
+              onEndChange={(v) => setSpaceForm({ ...spaceForm, endDate: v })}
             />
+            <AmountFields
+              rentAmount={spaceForm.rentAmount} deposit={spaceForm.deposit}
+              onRentChange={(v) => setSpaceForm({ ...spaceForm, rentAmount: v })}
+              onDepositChange={(v) => setSpaceForm({ ...spaceForm, deposit: v })}
+            />
+            <ActionButtons loading={loading} onSave={handleCreate} onCancel={() => setMode(null)} />
           </div>
+        )}
+
+        {/* ── 활성 계약 있음 ── */}
+        {activeContract && (
+          <>
+            {/* 계약 정보 보기 / 편집 */}
+            {mode === "edit" ? (
+              <div className="rounded-lg border p-4 space-y-4">
+                <DateFields
+                  startDate={editForm.startDate} endDate={editForm.endDate}
+                  onStartChange={(v) => setEditForm({ ...editForm, startDate: v })}
+                  onEndChange={(v) => setEditForm({ ...editForm, endDate: v })}
+                />
+                <AmountFields
+                  rentAmount={editForm.rentAmount} deposit={editForm.deposit}
+                  onRentChange={(v) => setEditForm({ ...editForm, rentAmount: v })}
+                  onDepositChange={(v) => setEditForm({ ...editForm, deposit: v })}
+                />
+                <ActionButtons loading={loading} onSave={handleSaveEdit} onCancel={() => setMode(null)} />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-muted-foreground">
+                <div>계약기간: <span className="text-foreground">{activeContract.start_date} ~ {activeContract.end_date}</span></div>
+                {activeContract.rent_amount > 0 && (
+                  <div>월 임대료: <span className="text-foreground">{activeContract.rent_amount.toLocaleString()}원</span></div>
+                )}
+                {activeContract.deposit > 0 && (
+                  <div>보증금: <span className="text-foreground">{activeContract.deposit.toLocaleString()}원</span></div>
+                )}
+              </div>
+            )}
+
+            {/* 배정된 호실 목록 */}
+            {activeContract.contract_spaces.length === 0 && mode !== "add" && (
+              <p className="text-sm text-muted-foreground">배정된 호실이 없습니다.</p>
+            )}
+            <div className="space-y-2">
+              {activeContract.contract_spaces.map((cs) => (
+                <div key={cs.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="default">입주 중</Badge>
+                    <span className="font-semibold">{cs.space?.name ?? "-"}</span>
+                    {cs.space?.floor && <span className="text-sm text-muted-foreground">{cs.space.floor}층</span>}
+                    {cs.space?.area != null && cs.space.area > 0 && (
+                      <span className="text-sm text-muted-foreground">{cs.space.area}m²</span>
+                    )}
+                  </div>
+                  {canEdit && mode === null && (
+                    <Button variant="ghost" size="sm" onClick={() => handleRemoveSpace(cs)} disabled={loading} className="text-destructive hover:text-destructive">
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* 호실 추가 폼 */}
+            {mode === "add" && (
+              <div className="rounded-lg border border-dashed p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">호실 추가</span>
+                  <Button variant="ghost" size="sm" onClick={() => setMode(null)} disabled={loading}><X className="h-3 w-3" /></Button>
+                </div>
+                <SpaceSelect value={spaceForm.spaceId} options={addableSpaces} onChange={(v) => setSpaceForm({ ...spaceForm, spaceId: v })} />
+                <ActionButtons loading={loading} onSave={handleAddSpace} onCancel={() => setMode(null)} />
+              </div>
+            )}
+
+            {/* 호실 추가 버튼 */}
+            {canEdit && mode === null && addableSpaces.length > 0 && (
+              <Button variant="outline" size="sm" onClick={openAdd}>
+                <Plus className="h-3 w-3 mr-1" />호실 추가
+              </Button>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
   );
 }
 
-interface SpaceFormProps {
-  form: SpaceFormState;
-  onChange: (form: SpaceFormState) => void;
-  spaceOptions: { id: string; name: string; area: number; floor: string | null; status?: string }[];
-  currentSpaceId?: string;
-  loading: boolean;
-  onSave: () => void;
-  onCancel: () => void;
+// ── 공통 서브 컴포넌트 ──────────────────────
+
+function SpaceSelect({
+  value, options, onChange,
+}: {
+  value: string;
+  options: { id: string; name: string; area: number; floor?: string | null }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>호실 선택</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger><SelectValue placeholder="호실을 선택하세요" /></SelectTrigger>
+        <SelectContent>
+          {options.map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              {s.name}{s.area > 0 ? ` (${s.area}m²)` : ""}
+            </SelectItem>
+          ))}
+          {options.length === 0 && (
+            <SelectItem value="__none__" disabled>선택 가능한 공실이 없습니다</SelectItem>
+          )}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 }
 
-function SpaceForm({ form, onChange, spaceOptions, currentSpaceId, loading, onSave, onCancel }: SpaceFormProps) {
+function DateFields({
+  startDate, endDate, onStartChange, onEndChange,
+}: {
+  startDate: string; endDate: string;
+  onStartChange: (v: string) => void; onEndChange: (v: string) => void;
+}) {
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 md:grid-cols-2">
       <div className="space-y-2">
-        <Label>호실 선택</Label>
-        <Select value={form.spaceId} onValueChange={(v) => onChange({ ...form, spaceId: v })}>
-          <SelectTrigger>
-            <SelectValue placeholder="호실을 선택하세요" />
-          </SelectTrigger>
-          <SelectContent>
-            {spaceOptions.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.name}
-                {s.area > 0 && ` (${s.area}m²)`}
-                {s.id === currentSpaceId ? " [현재]" : ""}
-              </SelectItem>
-            ))}
-            {spaceOptions.length === 0 && (
-              <SelectItem value="__none__" disabled>선택 가능한 공실이 없습니다</SelectItem>
-            )}
-          </SelectContent>
-        </Select>
+        <Label>계약 시작일</Label>
+        <Input type="date" value={startDate} onChange={(e) => onStartChange(e.target.value)} />
       </div>
+      <div className="space-y-2">
+        <Label>계약 종료일</Label>
+        <Input type="date" value={endDate} onChange={(e) => onEndChange(e.target.value)} />
+      </div>
+    </div>
+  );
+}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label>계약 시작일</Label>
-          <Input type="date" value={form.startDate} onChange={(e) => onChange({ ...form, startDate: e.target.value })} />
-        </div>
-        <div className="space-y-2">
-          <Label>계약 종료일</Label>
-          <Input type="date" value={form.endDate} onChange={(e) => onChange({ ...form, endDate: e.target.value })} />
-        </div>
+function AmountFields({
+  rentAmount, deposit, onRentChange, onDepositChange,
+}: {
+  rentAmount: string; deposit: string;
+  onRentChange: (v: string) => void; onDepositChange: (v: string) => void;
+}) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-2">
+        <Label>월 임대료 (원)</Label>
+        <Input type="number" value={rentAmount} onChange={(e) => onRentChange(e.target.value)} placeholder="0" />
       </div>
+      <div className="space-y-2">
+        <Label>보증금 (원)</Label>
+        <Input type="number" value={deposit} onChange={(e) => onDepositChange(e.target.value)} placeholder="0" />
+      </div>
+    </div>
+  );
+}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label>월 임대료 (원)</Label>
-          <Input type="number" value={form.rentAmount} onChange={(e) => onChange({ ...form, rentAmount: e.target.value })} placeholder="0" />
-        </div>
-        <div className="space-y-2">
-          <Label>보증금 (원)</Label>
-          <Input type="number" value={form.deposit} onChange={(e) => onChange({ ...form, deposit: e.target.value })} placeholder="0" />
-        </div>
-      </div>
-
-      <div className="flex gap-2 pt-1">
-        <Button onClick={onSave} disabled={loading}>
-          {loading ? "저장 중..." : "저장"}
-        </Button>
-        <Button variant="outline" onClick={onCancel} disabled={loading}>
-          취소
-        </Button>
-      </div>
+function ActionButtons({
+  loading, onSave, onCancel,
+}: {
+  loading: boolean; onSave: () => void; onCancel: () => void;
+}) {
+  return (
+    <div className="flex gap-2 pt-1">
+      <Button onClick={onSave} disabled={loading}>{loading ? "저장 중..." : "저장"}</Button>
+      <Button variant="outline" onClick={onCancel} disabled={loading}>취소</Button>
     </div>
   );
 }

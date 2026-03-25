@@ -11,7 +11,7 @@ export async function getMoveOuts(orgId?: string) {
 
   let query = supabase
     .from("move_outs")
-    .select("*, company:companies(name), contract:contracts(start_date, end_date, space_id, space:spaces(name))")
+    .select("*, company:companies(name), contract:contracts(start_date, end_date, contract_spaces(space:spaces(name)))")
     .order("created_at", { ascending: false });
 
   const filterOrgId = orgId || (profile.role !== "super_admin" ? profile.org_id : null);
@@ -26,7 +26,7 @@ export async function getMoveOut(id: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("move_outs")
-    .select("*, company:companies(name, representative), contract:contracts(start_date, end_date, deposit, space_id, space:spaces(name))")
+    .select("*, company:companies(name, representative), contract:contracts(start_date, end_date, deposit, contract_spaces(space:spaces(name)))")
     .eq("id", id)
     .single();
 
@@ -86,12 +86,6 @@ export async function updateMoveOutStatus(
 
     if (moveOut) {
       // 계약 상태 → terminated
-      const { data: contract } = await supabase
-        .from("contracts")
-        .select("space_id")
-        .eq("id", moveOut.contract_id)
-        .single();
-
       const { error: contractErr } = await supabase
         .from("contracts")
         .update({ status: "terminated" })
@@ -99,13 +93,16 @@ export async function updateMoveOutStatus(
 
       if (contractErr) throw new Error("계약 상태 변경 실패: " + contractErr.message);
 
-      // 호실 상태 → vacant
-      if (contract) {
-        const { error: spaceErr } = await supabase
-          .from("spaces")
-          .update({ status: "vacant" })
-          .eq("id", contract.space_id);
+      // 계약에 배정된 모든 호실 → vacant
+      const { data: contractSpaces } = await supabase
+        .from("contract_spaces")
+        .select("space_id")
+        .eq("contract_id", moveOut.contract_id);
 
+      if (contractSpaces && contractSpaces.length > 0) {
+        const spaceIds = contractSpaces.map((cs) => cs.space_id);
+        const { error: spaceErr } = await supabase
+          .from("spaces").update({ status: "vacant" }).in("id", spaceIds);
         if (spaceErr) throw new Error("호실 상태 변경 실패: " + spaceErr.message);
       }
 
