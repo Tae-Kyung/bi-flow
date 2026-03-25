@@ -15,7 +15,7 @@ export async function getSpaces(orgId?: string, sortBy?: string, sortOrder?: str
 
   let query = supabase
     .from("spaces")
-    .select("*, organization:organizations(name), contracts:contracts(id, company:companies(id, name), status)")
+    .select("*, organization:organizations(name), contract_spaces(contract:contracts(id, status, company:companies(id, name)))")
     .order(dbSortColumn, { ascending: sortBy === "name" ? ascending : true });
 
   const filterOrgId = orgId || (profile.role !== "super_admin" ? profile.org_id : null);
@@ -24,13 +24,13 @@ export async function getSpaces(orgId?: string, sortBy?: string, sortOrder?: str
   const { data, error } = await query;
   if (error) throw error;
 
-  // 각 space에 active 계약의 입주기업 정보 추가
+  // contract_spaces → active 계약의 입주기업 정보 추가
   let result = (data || []).map((space: any) => {
-    const activeContract = space.contracts?.find((c: any) => c.status === "active");
+    const activeCs = space.contract_spaces?.find((cs: any) => cs.contract?.status === "active");
     return {
       ...space,
-      tenant_company: activeContract?.company || null,
-      contracts: undefined,
+      tenant_company: activeCs?.contract?.company || null,
+      contract_spaces: undefined,
     };
   });
 
