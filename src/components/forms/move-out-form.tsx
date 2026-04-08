@@ -38,11 +38,17 @@ export function MoveOutForm({ contracts }: Props) {
             <Select name="contract_id" required>
               <SelectTrigger><SelectValue placeholder="계약 선택" /></SelectTrigger>
               <SelectContent>
-                {contracts.map((c: any) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.company?.name} - {c.space?.name} ({c.start_date} ~ {c.end_date})
-                  </SelectItem>
-                ))}
+                {contracts.map((c: any) => {
+                  const spaceNames = (c.contract_spaces ?? [])
+                    .map((cs: any) => cs.space?.name)
+                    .filter(Boolean)
+                    .join(", ") || c.space?.name || "-";
+                  return (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.company?.name} - {spaceNames} ({c.start_date} ~ {c.end_date})
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

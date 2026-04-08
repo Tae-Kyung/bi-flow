@@ -26,6 +26,8 @@ import type { Space } from "@/types";
 
 interface ContractSpace {
   id: string;
+  rent_amount?: number;
+  deposit?: number;
   space: { id: string; name: string; area: number; floor: string | null } | null;
 }
 
@@ -128,7 +130,10 @@ export function SpaceMappingCard({
     if (!spaceForm.spaceId) { toast.error("호실을 선택해주세요."); return; }
     setLoading(true);
     try {
-      await addSpaceToContract(activeContract!.id, spaceForm.spaceId, companyId);
+      await addSpaceToContract(
+        activeContract!.id, spaceForm.spaceId, companyId,
+        Number(spaceForm.rentAmount) || 0, Number(spaceForm.deposit) || 0,
+      );
       toast.success("호실이 추가되었습니다.");
       setMode(null);
       router.refresh();
@@ -264,12 +269,22 @@ export function SpaceMappingCard({
             <div className="space-y-2">
               {activeContract.contract_spaces.map((cs) => (
                 <div key={cs.id} className="flex items-center justify-between rounded-md border px-3 py-2">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <Badge variant="default">입주 중</Badge>
                     <span className="font-semibold">{cs.space?.name ?? "-"}</span>
                     {cs.space?.floor && <span className="text-sm text-muted-foreground">{cs.space.floor}층</span>}
                     {cs.space?.area != null && cs.space.area > 0 && (
                       <span className="text-sm text-muted-foreground">{cs.space.area}m²</span>
+                    )}
+                    {(cs.rent_amount ?? 0) > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        임대료 {(cs.rent_amount!).toLocaleString()}원
+                      </span>
+                    )}
+                    {(cs.deposit ?? 0) > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        보증금 {(cs.deposit!).toLocaleString()}원
+                      </span>
                     )}
                   </div>
                   {canEdit && mode === null && (
@@ -289,6 +304,11 @@ export function SpaceMappingCard({
                   <Button variant="ghost" size="sm" onClick={() => setMode(null)} disabled={loading}><X className="h-3 w-3" /></Button>
                 </div>
                 <SpaceSelect value={spaceForm.spaceId} options={addableSpaces} onChange={(v) => setSpaceForm({ ...spaceForm, spaceId: v })} />
+                <AmountFields
+                  rentAmount={spaceForm.rentAmount} deposit={spaceForm.deposit}
+                  onRentChange={(v) => setSpaceForm({ ...spaceForm, rentAmount: v })}
+                  onDepositChange={(v) => setSpaceForm({ ...spaceForm, deposit: v })}
+                />
                 <ActionButtons loading={loading} onSave={handleAddSpace} onCancel={() => setMode(null)} />
               </div>
             )}

@@ -319,15 +319,15 @@ export async function bulkCreateCompanies(
 }
 
 export async function updateCompany(id: string, formData: FormData) {
-  await requireAuth();
+  const profile = await requireAuth();
   const supabase = await createClient();
 
   const newStatus = (formData.get("status") as CompanyStatus) || "active";
 
-  // 기존 데이터 조회 (graduated_at 설정 여부 판단)
+  // 기존 데이터 조회 (graduated_at 설정 여부 및 이전 상태 판단)
   const { data: existing } = await supabase
     .from("companies")
-    .select("graduated_at")
+    .select("graduated_at, status, org_id")
     .eq("id", id)
     .single();
 
@@ -377,8 +377,61 @@ export async function updateCompany(id: string, formData: FormData) {
     .eq("id", id);
 
   if (error) throw error;
+
+  // 활성 → 졸업/해지 전환 시: 활성 계약 종료 + 호실 공실 처리 + 퇴거 기록 자동 생성
+  const wasActive = existing?.status === "active";
+  const isDeactivating = newStatus === "graduated" || newStatus === "terminated";
+  if (wasActive && isDeactivating) {
+    const { data: activeContracts } = await supabase
+      .from("contracts")
+      .select("id, deposit")
+      .eq("company_id", id)
+      .eq("status", "active");
+
+    if (activeContracts && activeContracts.length > 0) {
+      const contractIds = activeContracts.map((c) => c.id);
+
+      // 계약 종료
+      await supabase
+        .from("contracts")
+        .update({ status: "terminated" })
+        .in("id", contractIds);
+
+      // 배정된 호실 공실 처리
+      const { data: contractSpaces } = await supabase
+        .from("contract_spaces")
+        .select("space_id")
+        .in("contract_id", contractIds);
+
+      if (contractSpaces && contractSpaces.length > 0) {
+        const spaceIds = contractSpaces.map((cs) => cs.space_id);
+        await supabase.from("spaces").update({ status: "vacant" }).in("id", spaceIds);
+      }
+
+      // 퇴거관리 기록 자동 생성 (직접 처리 이력 보존, 보증금 정산은 별도 확인 필요)
+      const now = new Date().toISOString();
+      const today = now.split("T")[0];
+      await supabase.from("move_outs").insert(
+        activeContracts.map((c) => ({
+          company_id: id,
+          contract_id: c.id,
+          org_id: existing?.org_id,
+          requested_by: profile.id,
+          request_date: today,
+          exit_date: today,
+          status: "completed",
+          reason: "직접 처리 (보증금 정산 미확인)",
+          deposit_amount: c.deposit || 0,
+          completed_at: now,
+        }))
+      );
+    }
+  }
+
   revalidatePath("/companies");
   revalidatePath(`/companies/${id}`);
+  revalidatePath("/contracts");
+  revalidatePath("/spaces");
 }
 
 export async function deleteCompany(companyId: string) {

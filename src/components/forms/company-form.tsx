@@ -62,6 +62,18 @@ export function CompanyForm({ company, organizations, spaces, showOrgSelect }: P
   }
 
   async function handleSubmit(formData: FormData) {
+    // 활성 → 졸업/해지 전환 시 확인
+    if (company && company.status === "active") {
+      const newStatus = formData.get("status") as string;
+      if (newStatus === "graduated" || newStatus === "terminated") {
+        const label = newStatus === "graduated" ? "졸업" : "해지";
+        const confirmed = confirm(
+          `[${label}] 처리 시 활성 계약이 자동 종료되고 배정된 호실이 공실로 전환됩니다.\n\n보증금 정산이 필요한 경우 [퇴거관리]를 이용하세요.\n\n계속하시겠습니까?`
+        );
+        if (!confirmed) return;
+      }
+    }
+
     setLoading(true);
     // 추가 담당자 JSON 직렬화
     formData.set("extra_contacts", JSON.stringify(extraContacts));
