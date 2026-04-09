@@ -66,7 +66,7 @@ export function CompanyForm({ company, organizations, spaces, showOrgSelect }: P
     if (company && company.status === "active") {
       const newStatus = formData.get("status") as string;
       if (newStatus === "graduated" || newStatus === "terminated") {
-        const label = newStatus === "graduated" ? "졸업" : "해지";
+        const label = newStatus === "graduated" ? "졸업" : "퇴거";
         const confirmed = confirm(
           `[${label}] 처리 시 활성 계약이 자동 종료되고 배정된 호실이 공실로 전환됩니다.\n\n보증금 정산이 필요한 경우 [퇴거관리]를 이용하세요.\n\n계속하시겠습니까?`
         );
@@ -479,9 +479,9 @@ export function CompanyForm({ company, organizations, spaces, showOrgSelect }: P
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">활동</SelectItem>
+                        <SelectItem value="active">입주</SelectItem>
                         <SelectItem value="graduated">졸업</SelectItem>
-                        <SelectItem value="terminated">해지</SelectItem>
+                        <SelectItem value="terminated">퇴거</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

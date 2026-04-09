@@ -15,9 +15,9 @@ import { ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Plus, Upload } from "lu
 import { DeleteCompanyButton } from "@/components/companies/delete-company-button";
 
 const statusLabels: Record<string, string> = {
-  active: "활동",
+  active: "입주",
   graduated: "졸업",
-  terminated: "해지",
+  terminated: "퇴거",
 };
 
 const statusVariants: Record<string, "default" | "secondary" | "destructive"> = {
@@ -34,9 +34,9 @@ const corporateTypeLabels: Record<string, string> = {
 
 const tabs = [
   { key: "", label: "전체" },
-  { key: "active", label: "활동" },
+  { key: "active", label: "입주" },
   { key: "graduated", label: "졸업" },
-  { key: "terminated", label: "해지" },
+  { key: "terminated", label: "퇴거" },
 ];
 
 export default async function CompaniesPage({

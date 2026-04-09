@@ -225,7 +225,7 @@ export default async function DashboardPage() {
                 <div className="text-2xl font-bold text-green-600">
                   {activeCompanyCount ?? 0}
                 </div>
-                <p className="text-xs text-muted-foreground">활동</p>
+                <p className="text-xs text-muted-foreground">입주</p>
               </div>
               <div>
                 <div className="text-2xl font-bold text-blue-600">
@@ -237,7 +237,7 @@ export default async function DashboardPage() {
                 <div className="text-2xl font-bold text-red-600">
                   {terminatedCompanyCount ?? 0}
                 </div>
-                <p className="text-xs text-muted-foreground">해지</p>
+                <p className="text-xs text-muted-foreground">퇴거</p>
               </div>
             </div>
           </CardContent>

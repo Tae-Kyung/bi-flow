@@ -378,10 +378,10 @@ export async function updateCompany(id: string, formData: FormData) {
 
   if (error) throw error;
 
-  // 활성 → 졸업/해지 전환 시: 활성 계약 종료 + 호실 공실 처리 + 퇴거 기록 자동 생성
-  const wasActive = existing?.status === "active";
+  // 졸업/해지 상태 전환 시: 활성 계약 종료 + 호실 공실 처리 + 퇴거 기록 자동 생성
+  // (이미 비활성 상태여도 잔여 활성 계약이 있으면 정리)
   const isDeactivating = newStatus === "graduated" || newStatus === "terminated";
-  if (wasActive && isDeactivating) {
+  if (isDeactivating) {
     const { data: activeContracts } = await supabase
       .from("contracts")
       .select("id, deposit")
