@@ -118,6 +118,10 @@ export interface ContractSpace {
   id: string;
   contract_id: string;
   space_id: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  rent_amount?: number;
+  deposit?: number;
   space?: Space;
 }
 

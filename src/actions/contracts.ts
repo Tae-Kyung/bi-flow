@@ -35,7 +35,7 @@ export async function getActiveContractByCompany(companyId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("contracts")
-    .select("id, start_date, end_date, rent_amount, deposit, contract_spaces(id, rent_amount, deposit, space:spaces(id, name, area, floor))")
+    .select("id, start_date, end_date, rent_amount, deposit, contract_spaces(id, start_date, end_date, rent_amount, deposit, space:spaces(id, name, area, floor))")
     .eq("company_id", companyId)
     .eq("status", "active")
     .order("created_at", { ascending: false })
@@ -84,7 +84,7 @@ export async function createContractWithSpace(
   if (contractErr) throw new Error(contractErr.message);
 
   const { error: csErr } = await supabase
-    .from("contract_spaces").insert({ contract_id: contract.id, space_id: spaceId, rent_amount: rentAmount, deposit });
+    .from("contract_spaces").insert({ contract_id: contract.id, space_id: spaceId, start_date: startDate, end_date: endDate, rent_amount: rentAmount, deposit });
   if (csErr) throw new Error(csErr.message);
 
   await supabase.from("spaces").update({ status: "occupied" }).eq("id", spaceId);
@@ -100,7 +100,9 @@ export async function addSpaceToContract(
   spaceId: string,
   companyId: string,
   rentAmount: number = 0,
-  deposit: number = 0
+  deposit: number = 0,
+  startDate?: string,
+  endDate?: string
 ) {
   await requireAuth();
   const supabase = await createClient();
@@ -110,7 +112,14 @@ export async function addSpaceToContract(
   if (spaceCheck?.status === "occupied") throw new Error("이미 입주 중인 호실입니다.");
 
   const { error } = await supabase
-    .from("contract_spaces").insert({ contract_id: contractId, space_id: spaceId, rent_amount: rentAmount, deposit });
+    .from("contract_spaces").insert({
+      contract_id: contractId,
+      space_id: spaceId,
+      rent_amount: rentAmount,
+      deposit,
+      start_date: startDate || null,
+      end_date: endDate || null,
+    });
   if (error) throw new Error(error.message);
 
   await supabase.from("spaces").update({ status: "occupied" }).eq("id", spaceId);
@@ -138,6 +147,28 @@ export async function removeSpaceFromContract(
   revalidatePath(`/companies/${companyId}`);
   revalidatePath("/contracts");
   revalidatePath("/spaces");
+}
+
+// 공간별 이용기간/금액 수정
+export async function updateContractSpaceDetails(
+  contractSpaceId: string,
+  companyId: string,
+  startDate: string | null,
+  endDate: string | null,
+  rentAmount: number,
+  deposit: number
+) {
+  await requireAuth();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("contract_spaces")
+    .update({ start_date: startDate || null, end_date: endDate || null, rent_amount: rentAmount, deposit })
+    .eq("id", contractSpaceId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/companies/${companyId}`);
+  revalidatePath("/contracts");
 }
 
 // 계약 상세 정보(기간/금액) 수정
