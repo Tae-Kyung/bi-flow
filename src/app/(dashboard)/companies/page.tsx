@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { getCompanies, getCompanyStatusCounts } from "@/actions/companies";
+import { getOrganizations } from "@/actions/organizations";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,25 +43,44 @@ const tabs = [
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; sort?: string; order?: string }>;
+  searchParams: Promise<{ status?: string; sort?: string; order?: string; org?: string }>;
 }) {
   const profile = await requireAuth();
-  const { status, sort, order } = await searchParams;
-  const companies = await getCompanies(undefined, status, sort, order);
-  const counts = await getCompanyStatusCounts();
+  const { status, sort, order, org } = await searchParams;
 
   const isSuperAdmin = profile.role === "super_admin";
   const canCreate = isSuperAdmin || profile.role === "org_admin";
   const isAdmin = isSuperAdmin || profile.role === "org_admin";
   const colCount = isSuperAdmin ? 11 : 10;
 
+  const [companies, counts, organizations] = await Promise.all([
+    getCompanies(isSuperAdmin ? org : undefined, status, sort, order),
+    getCompanyStatusCounts(isSuperAdmin ? org : undefined),
+    isSuperAdmin ? getOrganizations() : Promise.resolve([]),
+  ]);
+
   function sortHref(field: string) {
     const nextOrder = sort === field && order === "asc" ? "desc" : "asc";
     const params = new URLSearchParams();
     if (status) params.set("status", status);
+    if (org) params.set("org", org);
     params.set("sort", field);
     params.set("order", nextOrder);
     return `/companies?${params.toString()}`;
+  }
+
+  function statusHref(statusKey: string) {
+    const params = new URLSearchParams();
+    if (statusKey) params.set("status", statusKey);
+    if (org) params.set("org", org);
+    return `/companies${params.toString() ? `?${params.toString()}` : ""}`;
+  }
+
+  function orgHref(orgId: string) {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    if (orgId) params.set("org", orgId);
+    return `/companies${params.toString() ? `?${params.toString()}` : ""}`;
   }
 
   function SortIcon({ field }: { field: string }) {
@@ -92,18 +112,37 @@ export default async function CompaniesPage({
         )}
       </div>
 
+      {/* 기관 필터 (super_admin 전용) */}
+      {isSuperAdmin && organizations.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <Link href={orgHref("")}>
+            <Badge
+              variant={!org ? "default" : "outline"}
+              className="cursor-pointer px-3 py-1 text-sm"
+            >
+              전체 기관
+            </Badge>
+          </Link>
+          {organizations.map((o: any) => (
+            <Link key={o.id} href={orgHref(o.id)}>
+              <Badge
+                variant={org === o.id ? "default" : "outline"}
+                className="cursor-pointer px-3 py-1 text-sm"
+              >
+                {o.name}
+              </Badge>
+            </Link>
+          ))}
+        </div>
+      )}
+
       {/* 상태별 필터 탭 */}
       <div className="flex gap-2">
         {tabs.map((tab) => {
           const isActive = (status || "") === tab.key;
           const count = tab.key ? counts[tab.key] ?? 0 : counts.all ?? 0;
           return (
-            <Link
-              key={tab.key}
-              href={
-                tab.key ? `/companies?status=${tab.key}` : "/companies"
-              }
-            >
+            <Link key={tab.key} href={statusHref(tab.key)}>
               <Badge
                 variant={isActive ? "default" : "outline"}
                 className="cursor-pointer px-3 py-1 text-sm"

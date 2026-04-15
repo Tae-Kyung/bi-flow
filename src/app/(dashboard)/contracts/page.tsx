@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { getContracts } from "@/actions/contracts";
+import { getOrganizations } from "@/actions/organizations";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,10 +27,23 @@ function daysUntil(dateStr: string) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-export default async function ContractsPage() {
+export default async function ContractsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ org?: string }>;
+}) {
   const profile = await requireAuth();
-  const contracts = await getContracts();
-  const canCreate = profile.role === "super_admin" || profile.role === "org_admin";
+  const { org } = await searchParams;
+
+  const isSuperAdmin = profile.role === "super_admin";
+  const canCreate = isSuperAdmin || profile.role === "org_admin";
+
+  const [contracts, organizations] = await Promise.all([
+    getContracts(isSuperAdmin ? org : undefined),
+    isSuperAdmin ? getOrganizations() : Promise.resolve([]),
+  ]);
+
+  const colCount = isSuperAdmin ? 6 : 5;
 
   return (
     <div className="space-y-6">
@@ -49,9 +63,35 @@ export default async function ContractsPage() {
           </div>
         )}
       </div>
+
+      {/* 기관 필터 (super_admin 전용) */}
+      {isSuperAdmin && organizations.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <Link href="/contracts">
+            <Badge
+              variant={!org ? "default" : "outline"}
+              className="cursor-pointer px-3 py-1 text-sm"
+            >
+              전체
+            </Badge>
+          </Link>
+          {organizations.map((o: any) => (
+            <Link key={o.id} href={`/contracts?org=${o.id}`}>
+              <Badge
+                variant={org === o.id ? "default" : "outline"}
+                className="cursor-pointer px-3 py-1 text-sm"
+              >
+                {o.name}
+              </Badge>
+            </Link>
+          ))}
+        </div>
+      )}
+
       <Table>
         <TableHeader>
           <TableRow>
+            {isSuperAdmin && <TableHead>기관</TableHead>}
             <TableHead>기업명</TableHead>
             <TableHead>호실</TableHead>
             <TableHead>계약기간</TableHead>
@@ -64,6 +104,11 @@ export default async function ContractsPage() {
             const days = c.status === "active" ? daysUntil(c.end_date) : null;
             return (
               <TableRow key={c.id}>
+                {isSuperAdmin && (
+                  <TableCell className="text-muted-foreground whitespace-nowrap">
+                    {c.organization?.name}
+                  </TableCell>
+                )}
                 <TableCell>
                   <Link href={`/contracts/${c.id}`} className="font-medium text-primary underline-offset-4 hover:underline">
                     {c.company?.name}
@@ -94,7 +139,7 @@ export default async function ContractsPage() {
           })}
           {contracts.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">등록된 계약이 없습니다.</TableCell>
+              <TableCell colSpan={colCount} className="text-center text-muted-foreground">등록된 계약이 없습니다.</TableCell>
             </TableRow>
           )}
         </TableBody>

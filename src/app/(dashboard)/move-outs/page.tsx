@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { getMoveOuts } from "@/actions/move-outs";
+import { getOrganizations } from "@/actions/organizations";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,10 +22,23 @@ const statusVariants: Record<string, "default" | "secondary" | "destructive" | "
   completed: "default",
 };
 
-export default async function MoveOutsPage() {
+export default async function MoveOutsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ org?: string }>;
+}) {
   const profile = await requireAuth();
-  const moveOuts = await getMoveOuts();
-  const canCreate = profile.role === "super_admin" || profile.role === "org_admin";
+  const { org } = await searchParams;
+
+  const isSuperAdmin = profile.role === "super_admin";
+  const canCreate = isSuperAdmin || profile.role === "org_admin";
+
+  const [moveOuts, organizations] = await Promise.all([
+    getMoveOuts(isSuperAdmin ? org : undefined),
+    isSuperAdmin ? getOrganizations() : Promise.resolve([]),
+  ]);
+
+  const colCount = isSuperAdmin ? 6 : 5;
 
   return (
     <div className="space-y-6">
@@ -36,9 +50,35 @@ export default async function MoveOutsPage() {
           </Link>
         )}
       </div>
+
+      {/* 기관 필터 (super_admin 전용) */}
+      {isSuperAdmin && organizations.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <Link href="/move-outs">
+            <Badge
+              variant={!org ? "default" : "outline"}
+              className="cursor-pointer px-3 py-1 text-sm"
+            >
+              전체
+            </Badge>
+          </Link>
+          {organizations.map((o: any) => (
+            <Link key={o.id} href={`/move-outs?org=${o.id}`}>
+              <Badge
+                variant={org === o.id ? "default" : "outline"}
+                className="cursor-pointer px-3 py-1 text-sm"
+              >
+                {o.name}
+              </Badge>
+            </Link>
+          ))}
+        </div>
+      )}
+
       <Table>
         <TableHeader>
           <TableRow>
+            {isSuperAdmin && <TableHead>기관</TableHead>}
             <TableHead>기업명</TableHead>
             <TableHead>호실</TableHead>
             <TableHead>신청일</TableHead>
@@ -55,6 +95,11 @@ export default async function MoveOutsPage() {
             const isAutoProcessed = m.reason?.includes("직접 처리");
             return (
               <TableRow key={m.id}>
+                {isSuperAdmin && (
+                  <TableCell className="text-muted-foreground whitespace-nowrap">
+                    {m.organization?.name}
+                  </TableCell>
+                )}
                 <TableCell>
                   <Link href={`/move-outs/${m.id}`} className="font-medium text-primary underline-offset-4 hover:underline">
                     {m.company?.name}
@@ -76,7 +121,7 @@ export default async function MoveOutsPage() {
           })}
           {moveOuts.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">퇴거 내역이 없습니다.</TableCell>
+              <TableCell colSpan={colCount} className="text-center text-muted-foreground">퇴거 내역이 없습니다.</TableCell>
             </TableRow>
           )}
         </TableBody>

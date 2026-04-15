@@ -32,12 +32,14 @@ export async function getCompanies(
   return data;
 }
 
-export async function getCompanyStatusCounts() {
+export async function getCompanyStatusCounts(orgId?: string) {
   const profile = await requireAuth();
   const supabase = await createClient();
 
   const statuses = ["active", "graduated", "terminated"] as const;
   const counts: Record<string, number> = {};
+
+  const filterOrgId = orgId || (profile.role !== "super_admin" ? profile.org_id : null);
 
   for (const s of statuses) {
     let query = supabase
@@ -45,8 +47,8 @@ export async function getCompanyStatusCounts() {
       .select("*", { count: "exact", head: true })
       .eq("status", s);
 
-    if (profile.role !== "super_admin" && profile.org_id) {
-      query = query.eq("org_id", profile.org_id);
+    if (filterOrgId) {
+      query = query.eq("org_id", filterOrgId);
     }
 
     const { count } = await query;
@@ -322,14 +324,15 @@ export async function updateCompany(id: string, formData: FormData) {
   const profile = await requireAuth();
   const supabase = await createClient();
 
-  const newStatus = (formData.get("status") as CompanyStatus) || "active";
-
   // 기존 데이터 조회 (graduated_at 설정 여부 및 이전 상태 판단)
   const { data: existing } = await supabase
     .from("companies")
     .select("graduated_at, status, org_id")
     .eq("id", id)
     .single();
+
+  // status 기본값은 기존 상태 유지 (active 강제 복원 방지)
+  const newStatus = (formData.get("status") as CompanyStatus) || existing?.status || "active";
 
   const extraContactsRaw = formData.get("extra_contacts") as string;
   let extra_contacts = [];
@@ -382,6 +385,10 @@ export async function updateCompany(id: string, formData: FormData) {
   // (이미 비활성 상태여도 잔여 활성 계약이 있으면 정리)
   const isDeactivating = newStatus === "graduated" || newStatus === "terminated";
   if (isDeactivating) {
+    const orgId = existing?.org_id;
+    const now = new Date().toISOString();
+    const today = now.split("T")[0];
+
     const { data: activeContracts } = await supabase
       .from("contracts")
       .select("id, deposit")
@@ -409,22 +416,60 @@ export async function updateCompany(id: string, formData: FormData) {
       }
 
       // 퇴거관리 기록 자동 생성 (직접 처리 이력 보존, 보증금 정산은 별도 확인 필요)
-      const now = new Date().toISOString();
-      const today = now.split("T")[0];
-      await supabase.from("move_outs").insert(
-        activeContracts.map((c) => ({
-          company_id: id,
-          contract_id: c.id,
-          org_id: existing?.org_id,
-          requested_by: profile.id,
-          request_date: today,
-          exit_date: today,
-          status: "completed",
-          reason: "직접 처리 (보증금 정산 미확인)",
-          deposit_amount: c.deposit || 0,
-          completed_at: now,
-        }))
-      );
+      if (orgId) {
+        await supabase.from("move_outs").insert(
+          activeContracts.map((c) => ({
+            company_id: id,
+            contract_id: c.id,
+            org_id: orgId,
+            requested_by: profile.id,
+            request_date: today,
+            exit_date: today,
+            status: "completed",
+            reason: "직접 처리 (보증금 정산 미확인)",
+            deposit_amount: c.deposit || 0,
+            completed_at: now,
+          }))
+        );
+      }
+    } else if (orgId) {
+      // active 계약은 없지만, move_out 기록이 없는 terminated 계약에 대해 퇴거 기록 생성
+      // (계약이 별도 경로로 먼저 종료된 경우 보완)
+      const { data: terminatedContracts } = await supabase
+        .from("contracts")
+        .select("id, deposit")
+        .eq("company_id", id)
+        .eq("status", "terminated");
+
+      if (terminatedContracts && terminatedContracts.length > 0) {
+        const contractIds = terminatedContracts.map((c) => c.id);
+
+        // 이미 move_out 기록이 있는 계약은 제외
+        const { data: existingMoveOuts } = await supabase
+          .from("move_outs")
+          .select("contract_id")
+          .in("contract_id", contractIds);
+
+        const existingContractIds = new Set((existingMoveOuts || []).map((m: any) => m.contract_id));
+        const missingContracts = terminatedContracts.filter((c) => !existingContractIds.has(c.id));
+
+        if (missingContracts.length > 0) {
+          await supabase.from("move_outs").insert(
+            missingContracts.map((c) => ({
+              company_id: id,
+              contract_id: c.id,
+              org_id: orgId,
+              requested_by: profile.id,
+              request_date: today,
+              exit_date: today,
+              status: "completed",
+              reason: "직접 처리 (보증금 정산 미확인)",
+              deposit_amount: c.deposit || 0,
+              completed_at: now,
+            }))
+          );
+        }
+      }
     }
   }
 

@@ -11,7 +11,7 @@ export async function getMoveOuts(orgId?: string) {
 
   let query = supabase
     .from("move_outs")
-    .select("*, company:companies(name), contract:contracts(start_date, end_date, contract_spaces(space:spaces(name)))")
+    .select("*, organization:organizations(name), company:companies(name), contract:contracts(start_date, end_date, contract_spaces(space:spaces(name)))")
     .order("created_at", { ascending: false });
 
   const filterOrgId = orgId || (profile.role !== "super_admin" ? profile.org_id : null);

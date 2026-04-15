@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { getSpaces } from "@/actions/spaces";
+import { getOrganizations } from "@/actions/organizations";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,19 +28,31 @@ const statusVariants: Record<string, "default" | "secondary"> = {
 export default async function SpacesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; order?: string }>;
+  searchParams: Promise<{ sort?: string; order?: string; org?: string }>;
 }) {
   const profile = await requireAuth();
-  const { sort, order } = await searchParams;
-  const spaces = await getSpaces(undefined, sort, order);
+  const { sort, order, org } = await searchParams;
 
   const isSuperAdmin = profile.role === "super_admin";
   const canCreate = isSuperAdmin || profile.role === "org_admin";
   const colCount = isSuperAdmin ? 8 : 7;
 
+  const [spaces, organizations] = await Promise.all([
+    getSpaces(isSuperAdmin ? org : undefined, sort, order),
+    isSuperAdmin ? getOrganizations() : Promise.resolve([]),
+  ]);
+
   function sortHref(field: string) {
     const nextOrder = sort === field && order === "asc" ? "desc" : "asc";
-    return `/spaces?sort=${field}&order=${nextOrder}`;
+    const params = new URLSearchParams();
+    if (org) params.set("org", org);
+    params.set("sort", field);
+    params.set("order", nextOrder);
+    return `/spaces?${params.toString()}`;
+  }
+
+  function orgHref(orgId: string) {
+    return orgId ? `/spaces?org=${orgId}` : "/spaces";
   }
 
   function SortIcon({ field }: { field: string }) {
@@ -70,6 +83,30 @@ export default async function SpacesPage({
           </div>
         )}
       </div>
+
+      {/* 기관 필터 (super_admin 전용) */}
+      {isSuperAdmin && organizations.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <Link href={orgHref("")}>
+            <Badge
+              variant={!org ? "default" : "outline"}
+              className="cursor-pointer px-3 py-1 text-sm"
+            >
+              전체
+            </Badge>
+          </Link>
+          {organizations.map((o: any) => (
+            <Link key={o.id} href={orgHref(o.id)}>
+              <Badge
+                variant={org === o.id ? "default" : "outline"}
+                className="cursor-pointer px-3 py-1 text-sm"
+              >
+                {o.name}
+              </Badge>
+            </Link>
+          ))}
+        </div>
+      )}
 
       <Table>
         <TableHeader>

@@ -15,7 +15,7 @@ export async function getContracts(orgId?: string) {
 
   let query = supabase
     .from("contracts")
-    .select("*, company:companies(name), contract_spaces(space:spaces(name))")
+    .select("*, organization:organizations(name), company:companies(name), contract_spaces(space:spaces(name))")
     .order("created_at", { ascending: false });
 
   const filterOrgId = orgId || (profile.role !== "super_admin" ? profile.org_id : null);
