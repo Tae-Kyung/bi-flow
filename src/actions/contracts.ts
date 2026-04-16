@@ -318,6 +318,43 @@ export async function renewContract(oldContractId: string, formData: FormData) {
   revalidatePath("/spaces");
 }
 
+export async function deleteContract(id: string) {
+  const profile = await requireAuth();
+  if (profile.role !== "super_admin" && profile.role !== "org_admin") {
+    throw new Error("권한이 없습니다.");
+  }
+
+  const supabase = await createClient();
+
+  const { data: contract } = await supabase
+    .from("contracts").select("status, company_id").eq("id", id).single();
+
+  // 활성 계약인 경우 배정된 호실을 공실로 전환
+  if (contract?.status === "active") {
+    const { data: contractSpaces } = await supabase
+      .from("contract_spaces").select("space_id").eq("contract_id", id);
+    if (contractSpaces && contractSpaces.length > 0) {
+      const spaceIds = contractSpaces.map((cs) => cs.space_id);
+      await supabase.from("spaces").update({ status: "vacant" }).in("id", spaceIds);
+    }
+  }
+
+  // 이 계약을 참조하는 연장 계약의 previous_contract_id를 NULL로 초기화
+  // (FK 제약: ON DELETE 없으므로 직접 처리 필요)
+  await supabase
+    .from("contracts")
+    .update({ previous_contract_id: null })
+    .eq("previous_contract_id", id);
+
+  const { error } = await supabase.from("contracts").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/contracts");
+  revalidatePath("/spaces");
+  revalidatePath("/move-outs");
+  if (contract?.company_id) revalidatePath(`/companies/${contract.company_id}`);
+}
+
 export async function bulkRenewContracts(
   renewals: { contractId: string; newEndDate: string; newStartDate: string }[]
 ): Promise<{ renewed: number }> {

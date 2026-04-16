@@ -4,6 +4,7 @@ import { getCompanies } from "@/actions/companies";
 import { getSpaces } from "@/actions/spaces";
 import { getOrganizations } from "@/actions/organizations";
 import { ContractForm } from "@/components/forms/contract-form";
+import { DeleteContractButton } from "@/components/contracts/delete-contract-button";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { Company, Contract, Organization, Space } from "@/types";
@@ -34,11 +35,19 @@ export default async function ContractDetailPage({
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">계약 수정</h1>
-        {canRenew && (
-          <Link href={`/contracts/${id}/renew`}>
-            <Button variant="outline">연장</Button>
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {canRenew && (
+            <Link href={`/contracts/${id}/renew`}>
+              <Button variant="outline">연장</Button>
+            </Link>
+          )}
+          {isAdmin && (
+            <DeleteContractButton
+              contractId={id}
+              companyName={contract.company?.name}
+            />
+          )}
+        </div>
       </div>
       <ContractForm
         contract={contract}
