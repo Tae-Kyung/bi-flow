@@ -12,6 +12,7 @@ import {
   FileText,
   ClipboardList,
   LogOut as LogOutIcon,
+  BarChart3,
 } from "lucide-react";
 
 interface NavItem {
@@ -62,6 +63,12 @@ const navItems: NavItem[] = [
     label: "퇴거 관리",
     href: "/move-outs",
     icon: LogOutIcon,
+    roles: ["super_admin", "org_admin"],
+  },
+  {
+    label: "현금 흐름 분석",
+    href: "/cash-flow",
+    icon: BarChart3,
     roles: ["super_admin", "org_admin"],
   },
 ];
