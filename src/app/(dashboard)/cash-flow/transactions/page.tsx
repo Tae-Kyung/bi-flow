@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { getCashTransactions } from "@/actions/cash-flow";
+import { getCashTransactions, getCashExpenseCategories, getCashIncomeCategories } from "@/actions/cash-flow";
 import { TransactionDeleteButton } from "@/components/cash-flow/transaction-delete-button";
+import { TransactionFilters } from "@/components/cash-flow/transaction-filters";
 
 const EXPENSE_BADGE: Record<string, string> = {
   인건비: "destructive",
@@ -67,6 +68,14 @@ export default async function TransactionsPage({
     page
   );
 
+  // 분류 목록 (지출/수입 비목)
+  const [expenseCats, incomeCats] = orgId
+    ? await Promise.all([getCashExpenseCategories(orgId), getCashIncomeCategories(orgId)])
+    : [[], []];
+  const expenseCategories = expenseCats.map((c) => c.name);
+  const incomeCategories = incomeCats.map((c) => c.name);
+  const categoryOptions = type === "expense" ? expenseCategories : type === "income" ? incomeCategories : [...expenseCategories, ...incomeCategories];
+
   // 현재 필터 파라미터에서 org를 포함한 URLSearchParams 생성 헬퍼
   function buildParams(overrides: Record<string, string>) {
     const base: Record<string, string> = {};
@@ -86,7 +95,14 @@ export default async function TransactionsPage({
         </Link>
         <div>
           <h1 className="text-2xl font-bold">거래 내역</h1>
-          {orgName && <p className="text-sm text-muted-foreground">{orgName}</p>}
+          <p className="text-sm text-muted-foreground">
+            {[
+              orgName,
+              from || to ? `${from || ""}~${to || ""}` : "전체 기간",
+              type === "expense" ? "지출" : type === "income" ? "수입" : "",
+              category,
+            ].filter(Boolean).join(" · ")}
+          </p>
         </div>
       </div>
 
@@ -124,49 +140,16 @@ export default async function TransactionsPage({
       )}
 
       {/* 필터 */}
-      <div className="flex flex-wrap gap-2 text-sm">
-        <form method="get" className="flex items-center gap-2 flex-wrap">
-          {profile.role === "super_admin" && orgId && (
-            <input type="hidden" name="org" value={orgId} />
-          )}
-          <input
-            type="date"
-            name="from"
-            defaultValue={from}
-            className="rounded border px-2 py-1 text-sm bg-background"
-          />
-          <span className="text-muted-foreground">~</span>
-          <input
-            type="date"
-            name="to"
-            defaultValue={to}
-            className="rounded border px-2 py-1 text-sm bg-background"
-          />
-          <select
-            name="type"
-            defaultValue={type}
-            className="rounded border px-2 py-1 text-sm bg-background"
-          >
-            <option value="">전체</option>
-            <option value="income">입금만</option>
-            <option value="expense">출금만</option>
-          </select>
-          <button
-            type="submit"
-            className="rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground"
-          >
-            조회
-          </button>
-          {(from || to || type) && (
-            <Link
-              href={`/cash-flow/transactions${orgId && profile.role === "super_admin" ? `?org=${orgId}` : ""}`}
-              className="rounded-md border px-3 py-1 text-sm hover:bg-muted"
-            >
-              초기화
-            </Link>
-          )}
-        </form>
-      </div>
+      <TransactionFilters
+        orgId={orgId}
+        isSuperAdmin={profile.role === "super_admin"}
+        from={from}
+        to={to}
+        type={type}
+        category={category}
+        expenseCategories={expenseCategories}
+        incomeCategories={incomeCategories}
+      />
 
       <Card>
         <CardHeader>

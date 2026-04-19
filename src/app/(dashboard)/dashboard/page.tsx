@@ -13,6 +13,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { CheckExpiringButton } from "@/components/dashboard/check-expiring-button";
+import Link from "next/link";
 
 export default async function DashboardPage() {
   const profile = await requireAuth();
@@ -483,7 +484,14 @@ export default async function DashboardPage() {
                     const curNet = row.current.deposit - row.current.withdrawal;
                     return (
                       <tr key={row.orgId} className={`border-b ${i % 2 === 0 ? "" : "bg-muted/20"}`}>
-                        <td className="px-4 py-2 font-medium whitespace-nowrap">{row.orgName}</td>
+                        <td className="px-4 py-2 font-medium whitespace-nowrap">
+                          <Link
+                            href={profile.role === "super_admin" ? `/cash-flow?org=${row.orgId}` : "/cash-flow"}
+                            className="hover:underline text-primary"
+                          >
+                            {row.orgName}
+                          </Link>
+                        </td>
                         <td className="px-4 py-2 text-right font-mono text-blue-600 text-xs">
                           {row.last.deposit > 0 ? row.last.deposit.toLocaleString("ko-KR") : "-"}
                         </td>

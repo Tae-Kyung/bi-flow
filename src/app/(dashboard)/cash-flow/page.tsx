@@ -241,20 +241,30 @@ export default async function CashFlowPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {expenseCats.map((cat, i) => (
-                      <tr key={cat.name} className={i % 2 === 0 ? "" : "bg-muted/20"}>
-                        <td className="px-4 py-2">{cat.name}</td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">{cat.count}</td>
-                        <td className="px-4 py-2 text-right font-mono">
-                          {cat.amount.toLocaleString("ko-KR")}
-                        </td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">
-                          {summary.totalWithdrawal > 0
-                            ? `${((cat.amount / summary.totalWithdrawal) * 100).toFixed(1)}%`
-                            : "-"}
-                        </td>
-                      </tr>
-                    ))}
+                    {expenseCats.map((cat, i) => {
+                      const qs = new URLSearchParams({ type: "expense", category: cat.name });
+                      if (profile.role === "super_admin") qs.set("org", orgId);
+                      if (from) qs.set("from", from);
+                      if (to) qs.set("to", to);
+                      return (
+                        <tr key={cat.name} className={`border-b cursor-pointer hover:bg-muted/40 transition-colors ${i % 2 === 0 ? "" : "bg-muted/20"}`}>
+                          <td className="px-4 py-2">
+                            <Link href={`/cash-flow/transactions?${qs}`} className="block w-full hover:underline text-primary">
+                              {cat.name}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-2 text-right text-muted-foreground">{cat.count}</td>
+                          <td className="px-4 py-2 text-right font-mono">
+                            {cat.amount.toLocaleString("ko-KR")}
+                          </td>
+                          <td className="px-4 py-2 text-right text-muted-foreground">
+                            {summary.totalWithdrawal > 0
+                              ? `${((cat.amount / summary.totalWithdrawal) * 100).toFixed(1)}%`
+                              : "-"}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -285,20 +295,30 @@ export default async function CashFlowPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {incomeCats.map((cat, i) => (
-                      <tr key={cat.name} className={i % 2 === 0 ? "" : "bg-muted/20"}>
-                        <td className="px-4 py-2">{cat.name}</td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">{cat.count}</td>
-                        <td className="px-4 py-2 text-right font-mono">
-                          {cat.amount.toLocaleString("ko-KR")}
-                        </td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">
-                          {summary.totalDeposit > 0
-                            ? `${((cat.amount / summary.totalDeposit) * 100).toFixed(1)}%`
-                            : "-"}
-                        </td>
-                      </tr>
-                    ))}
+                    {incomeCats.map((cat, i) => {
+                      const qs = new URLSearchParams({ type: "income", category: cat.name });
+                      if (profile.role === "super_admin") qs.set("org", orgId);
+                      if (from) qs.set("from", from);
+                      if (to) qs.set("to", to);
+                      return (
+                        <tr key={cat.name} className={`border-b cursor-pointer hover:bg-muted/40 transition-colors ${i % 2 === 0 ? "" : "bg-muted/20"}`}>
+                          <td className="px-4 py-2">
+                            <Link href={`/cash-flow/transactions?${qs}`} className="block w-full hover:underline text-primary">
+                              {cat.name}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-2 text-right text-muted-foreground">{cat.count}</td>
+                          <td className="px-4 py-2 text-right font-mono">
+                            {cat.amount.toLocaleString("ko-KR")}
+                          </td>
+                          <td className="px-4 py-2 text-right text-muted-foreground">
+                            {summary.totalDeposit > 0
+                              ? `${((cat.amount / summary.totalDeposit) * 100).toFixed(1)}%`
+                              : "-"}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

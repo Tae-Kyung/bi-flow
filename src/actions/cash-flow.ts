@@ -268,6 +268,7 @@ export async function getCashTransactions(
   if (type === "expense") query = query.gt("withdrawal", 0);
   if (category && type === "expense") query = query.eq("expense_category", category);
   if (category && type === "income") query = query.eq("income_category", category);
+  if (category && !type) query = query.or(`expense_category.eq.${category},income_category.eq.${category}`);
 
   const { data, error } = await query;
   return { data: data ?? [], error };
