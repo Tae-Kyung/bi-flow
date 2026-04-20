@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { parseCashTxt } from "@/lib/parse-cash-txt";
 import { parseCashXls } from "@/lib/parse-cash-xls";
 
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -74,7 +76,7 @@ export async function POST(req: NextRequest) {
     console.log("[cash-upload] new:", newRows.length, "skipped:", skipped);
 
     if (newRows.length > 0) {
-      const CHUNK = 500;
+      const CHUNK = 1000;
       for (let i = 0; i < newRows.length; i += CHUNK) {
         const chunk = newRows.slice(i, i + CHUNK).map((r) => ({
           ...r,

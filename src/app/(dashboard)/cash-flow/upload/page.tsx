@@ -6,6 +6,8 @@ import Link from "next/link";
 import { CashUploadClient } from "@/components/cash-flow/upload-client";
 import { getUploadedFiles } from "@/actions/cash-flow";
 
+export const dynamic = "force-dynamic";
+
 export default async function CashUploadPage({
   searchParams,
 }: {
