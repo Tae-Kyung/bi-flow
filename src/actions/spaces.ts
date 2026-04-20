@@ -10,13 +10,13 @@ export async function getSpaces(orgId?: string, sortBy?: string, sortOrder?: str
 
   const ascending = sortOrder !== "desc";
 
-  // 호실명은 DB 레벨 정렬, 입주기업은 조인 후 메모리 정렬
-  const dbSortColumn = sortBy === "name" ? "name" : "created_at";
+  // 호실명은 DB 레벨 정렬 (기본: 이름순), 입주기업은 조인 후 메모리 정렬
+  const dbSortColumn = sortBy === "company" ? "created_at" : "name";
 
   let query = supabase
     .from("spaces")
     .select("*, organization:organizations(name), contract_spaces(contract:contracts(id, status, company:companies(id, name)))")
-    .order(dbSortColumn, { ascending: sortBy === "name" ? ascending : true });
+    .order(dbSortColumn, { ascending: sortBy === "company" ? true : ascending });
 
   const filterOrgId = orgId || (profile.role !== "super_admin" ? profile.org_id : null);
   if (filterOrgId) query = query.eq("org_id", filterOrgId);

@@ -64,6 +64,24 @@ export async function createMoveOut(formData: FormData) {
   revalidatePath("/move-outs");
 }
 
+export async function deleteMoveOut(id: string) {
+  const profile = await requireAuth();
+  if (profile.role === "tenant") throw new Error("권한 없음");
+
+  const supabase = await createClient();
+
+  // org_admin은 자신의 org 데이터만 삭제 가능
+  let query = supabase.from("move_outs").delete().eq("id", id);
+  if (profile.role === "org_admin") {
+    query = query.eq("org_id", profile.org_id!);
+  }
+
+  const { error } = await query;
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/move-outs");
+}
+
 export async function updateMoveOutStatus(
   id: string,
   status: MoveOutStatus,

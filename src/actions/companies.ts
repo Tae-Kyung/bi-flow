@@ -15,7 +15,7 @@ export async function getCompanies(
   const supabase = await createClient();
 
   const allowedSortFields = ["name", "representative", "created_at"];
-  const column = allowedSortFields.includes(sortBy ?? "") ? sortBy! : "created_at";
+  const column = allowedSortFields.includes(sortBy ?? "") ? sortBy! : "name";
   const ascending = sortOrder !== "desc";
 
   let query = supabase

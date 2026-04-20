@@ -60,7 +60,7 @@ export default async function TransactionsPage({
     orgName = org?.name ?? "";
   }
 
-  const { data: transactions } = await getCashTransactions(
+  const { data: transactions, totalCount } = await getCashTransactions(
     orgId,
     from || undefined,
     to || undefined,
@@ -162,7 +162,7 @@ export default async function TransactionsPage({
           <CardTitle className="text-base">
             거래 내역{" "}
             <span className="font-normal text-muted-foreground">
-              ({transactions.length}건{transactions.length === 50 ? " · 다음 페이지 있음" : ""})
+              (총 {totalCount.toLocaleString("ko-KR")}건{totalCount > 50 ? ` · ${page + 1}/${Math.ceil(totalCount / 50)} 페이지` : ""})
             </span>
           </CardTitle>
         </CardHeader>
@@ -245,7 +245,7 @@ export default async function TransactionsPage({
       </Card>
 
       {/* 페이지네이션 */}
-      {orgId && (
+      {orgId && totalCount > 50 && (
         <div className="flex items-center justify-center gap-2 text-sm">
           {page > 0 && (
             <Link
@@ -255,8 +255,10 @@ export default async function TransactionsPage({
               이전
             </Link>
           )}
-          <span className="text-muted-foreground">페이지 {page + 1}</span>
-          {transactions.length === 50 && (
+          <span className="text-muted-foreground">
+            {page + 1} / {Math.ceil(totalCount / 50)}
+          </span>
+          {(page + 1) * 50 < totalCount && (
             <Link
               href={`/cash-flow/transactions?${buildParams({ page: String(page + 1) })}`}
               className="rounded border px-3 py-1 hover:bg-muted"

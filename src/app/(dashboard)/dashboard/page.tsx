@@ -154,19 +154,39 @@ export default async function DashboardPage() {
 
   // === 기관별 월별 수입지출 현황 ===
   const now = new Date();
-  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split("T")[0];
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split("T")[0];
-  const thisMonthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
-  const lastMonthLabel = `${now.getFullYear()}년 ${now.getMonth() === 0 ? 12 : now.getMonth()}월`;
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0-indexed
+  const pad = (n: number) => String(n).padStart(2, "0");
+  // toISOString()은 UTC 변환되어 날짜가 하루 밀리므로, 직접 로컬 날짜 문자열 생성
+  const thisMonthStart = `${y}-${pad(m + 1)}-01`;
+  const lastMonthYear = m === 0 ? y - 1 : y;
+  const lastMonth = m === 0 ? 12 : m;
+  const lastMonthStart = `${lastMonthYear}-${pad(lastMonth)}-01`;
+  const lastMonthLastDay = new Date(y, m, 0).getDate();
+  const lastMonthEnd = `${lastMonthYear}-${pad(lastMonth)}-${pad(lastMonthLastDay)}`;
+  const thisMonthLabel = `${y}년 ${m + 1}월`;
+  const lastMonthLabel = `${lastMonthYear}년 ${lastMonth}월`;
 
-  let cashFlowQuery = supabase
-    .from("cash_transactions")
-    .select("org_id, approved_at, deposit, withdrawal")
-    .gte("approved_at", lastMonthStart)
-    .lte("approved_at", today);
-  if (orgFilter) cashFlowQuery = cashFlowQuery.eq("org_id", orgFilter);
-  const { data: cashFlowRaw } = await cashFlowQuery;
+  // Supabase 기본 1000행 제한 우회: 페이지네이션
+  let cashFlowRaw: { org_id: string; approved_at: string; deposit: number; withdrawal: number }[] = [];
+  {
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      let q = supabase
+        .from("cash_transactions")
+        .select("org_id, approved_at, deposit, withdrawal")
+        .gte("approved_at", lastMonthStart)
+        .lte("approved_at", today)
+        .range(from, from + PAGE - 1);
+      if (orgFilter) q = q.eq("org_id", orgFilter);
+      const { data } = await q;
+      if (!data || data.length === 0) break;
+      cashFlowRaw.push(...data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+  }
 
   // org_id별, 기간별 집계
   type MonthStat = { deposit: number; withdrawal: number };

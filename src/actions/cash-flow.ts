@@ -83,6 +83,23 @@ export interface CashSummary {
   dateTo: string;
 }
 
+// Supabase 기본 1000행 제한 우회: 페이지네이션으로 전체 조회
+async function fetchAll<T>(
+  queryBuilder: any,
+  pageSize = 1000
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await queryBuilder.range(from, from + pageSize - 1);
+    if (error || !data || data.length === 0) break;
+    all.push(...(data as T[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 function periodKey(date: string, gran: Granularity): string {
   const d = new Date(date);
   const y = d.getFullYear();
@@ -113,8 +130,8 @@ export async function getCashTimeSeries(
   if (from) query = query.gte("approved_at", from);
   if (to) query = query.lte("approved_at", to);
 
-  const { data, error } = await query;
-  if (error || !data) return [];
+  const data = await fetchAll<{ approved_at: string; deposit: number; withdrawal: number }>(query);
+  if (data.length === 0) return [];
 
   const map = new Map<string, { deposit: number; withdrawal: number }>();
   for (const row of data) {
@@ -152,8 +169,8 @@ export async function getCashExpenseCategories(
   if (from) query = query.gte("approved_at", from);
   if (to) query = query.lte("approved_at", to);
 
-  const { data, error } = await query;
-  if (error || !data) return [];
+  const data = await fetchAll<{ expense_category: string; withdrawal: number }>(query);
+  if (data.length === 0) return [];
 
   const map = new Map<string, { amount: number; count: number }>();
   for (const row of data) {
@@ -185,8 +202,8 @@ export async function getCashIncomeCategories(
   if (from) query = query.gte("approved_at", from);
   if (to) query = query.lte("approved_at", to);
 
-  const { data, error } = await query;
-  if (error || !data) return [];
+  const data = await fetchAll<{ income_category: string; deposit: number }>(query);
+  if (data.length === 0) return [];
 
   const map = new Map<string, { amount: number; count: number }>();
   for (const row of data) {
@@ -217,8 +234,8 @@ export async function getCashSummary(
   if (from) query = query.gte("approved_at", from);
   if (to) query = query.lte("approved_at", to);
 
-  const { data, error } = await query;
-  if (error || !data) return { totalDeposit: 0, totalWithdrawal: 0, netFlow: 0, txCount: 0, dateFrom: "", dateTo: "" };
+  const data = await fetchAll<{ deposit: number; withdrawal: number; approved_at: string }>(query);
+  if (data.length === 0) return { totalDeposit: 0, totalWithdrawal: 0, netFlow: 0, txCount: 0, dateFrom: "", dateTo: "" };
 
   let totalDeposit = 0;
   let totalWithdrawal = 0;
@@ -257,7 +274,7 @@ export async function getCashTransactions(
 
   let query = supabase
     .from("cash_transactions")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("org_id", orgId)
     .order("approved_at", { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -270,20 +287,21 @@ export async function getCashTransactions(
   if (category && type === "income") query = query.eq("income_category", category);
   if (category && !type) query = query.or(`expense_category.eq.${category},income_category.eq.${category}`);
 
-  const { data, error } = await query;
-  return { data: data ?? [], error };
+  const { data, error, count } = await query;
+  return { data: data ?? [], error, totalCount: count ?? 0 };
 }
 
 export async function getUploadedFiles(orgId: string) {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("cash_transactions")
-    .select("file_name, uploaded_at, approved_at")
-    .eq("org_id", orgId)
-    .order("uploaded_at", { ascending: false });
 
-  if (!data) return [];
-  // 파일명별 요약
+  const data = await fetchAll<{ file_name: string; uploaded_at: string; approved_at: string }>(
+    supabase
+      .from("cash_transactions")
+      .select("file_name, uploaded_at, approved_at")
+      .eq("org_id", orgId)
+      .order("uploaded_at", { ascending: false })
+  );
+
   const map = new Map<string, { file_name: string; uploaded_at: string; count: number; dateFrom: string; dateTo: string }>();
   for (const row of data) {
     const key = row.file_name ?? "";
@@ -316,8 +334,8 @@ export async function getOrgsCashSummary(from?: string, to?: string): Promise<Or
   if (from) query = query.gte("approved_at", from);
   if (to) query = query.lte("approved_at", to);
 
-  const { data, error } = await query;
-  if (error || !data) return [];
+  const data = await fetchAll<{ org_id: string; deposit: number; withdrawal: number; approved_at: string }>(query);
+  if (data.length === 0) return [];
 
   const map = new Map<string, { deposit: number; withdrawal: number; count: number; dateFrom: string; dateTo: string }>();
   for (const row of data) {

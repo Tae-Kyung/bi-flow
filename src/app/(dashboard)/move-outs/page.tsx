@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
+import { MoveOutDeleteButton } from "@/components/move-outs/move-out-delete-button";
 
 const statusLabels: Record<string, string> = {
   requested: "신청",
@@ -38,7 +39,8 @@ export default async function MoveOutsPage({
     isSuperAdmin ? getOrganizations() : Promise.resolve([]),
   ]);
 
-  const colCount = isSuperAdmin ? 6 : 5;
+  const canDelete = isSuperAdmin || profile.role === "org_admin";
+  const colCount = (isSuperAdmin ? 6 : 5) + (canDelete ? 1 : 0);
 
   return (
     <div className="space-y-6">
@@ -84,6 +86,7 @@ export default async function MoveOutsPage({
             <TableHead>신청일</TableHead>
             <TableHead>퇴거예정일</TableHead>
             <TableHead>상태</TableHead>
+            {canDelete && <TableHead className="w-10" />}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -116,6 +119,11 @@ export default async function MoveOutsPage({
                     )}
                   </div>
                 </TableCell>
+                {canDelete && (
+                  <TableCell>
+                    <MoveOutDeleteButton id={m.id} />
+                  </TableCell>
+                )}
               </TableRow>
             );
           })}
