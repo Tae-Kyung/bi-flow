@@ -83,15 +83,15 @@ export interface CashSummary {
   dateTo: string;
 }
 
-// Supabase 기본 1000행 제한 우회: 페이지네이션으로 전체 조회
+// Supabase 기본 1000행 제한 우회: 매 페이지마다 새 쿼리 생성
 async function fetchAll<T>(
-  queryBuilder: any,
+  buildQuery: () => any,
   pageSize = 1000
 ): Promise<T[]> {
   const all: T[] = [];
   let from = 0;
   while (true) {
-    const { data, error } = await queryBuilder.range(from, from + pageSize - 1);
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
     if (error || !data || data.length === 0) break;
     all.push(...(data as T[]));
     if (data.length < pageSize) break;
@@ -121,16 +121,16 @@ export async function getCashTimeSeries(
 ): Promise<TimeSeriesPoint[]> {
   const supabase = await createClient();
 
-  let query = supabase
-    .from("cash_transactions")
-    .select("approved_at, deposit, withdrawal")
-    .eq("org_id", orgId)
-    .order("approved_at", { ascending: true });
-
-  if (from) query = query.gte("approved_at", from);
-  if (to) query = query.lte("approved_at", to);
-
-  const data = await fetchAll<{ approved_at: string; deposit: number; withdrawal: number }>(query);
+  const data = await fetchAll<{ approved_at: string; deposit: number; withdrawal: number }>(() => {
+    let q = supabase
+      .from("cash_transactions")
+      .select("approved_at, deposit, withdrawal")
+      .eq("org_id", orgId)
+      .order("approved_at", { ascending: true });
+    if (from) q = q.gte("approved_at", from);
+    if (to) q = q.lte("approved_at", to);
+    return q;
+  });
   if (data.length === 0) return [];
 
   const map = new Map<string, { deposit: number; withdrawal: number }>();
@@ -160,16 +160,16 @@ export async function getCashExpenseCategories(
 ): Promise<CategoryPoint[]> {
   const supabase = await createClient();
 
-  let query = supabase
-    .from("cash_transactions")
-    .select("expense_category, withdrawal")
-    .eq("org_id", orgId)
-    .gt("withdrawal", 0);
-
-  if (from) query = query.gte("approved_at", from);
-  if (to) query = query.lte("approved_at", to);
-
-  const data = await fetchAll<{ expense_category: string; withdrawal: number }>(query);
+  const data = await fetchAll<{ expense_category: string; withdrawal: number }>(() => {
+    let q = supabase
+      .from("cash_transactions")
+      .select("expense_category, withdrawal")
+      .eq("org_id", orgId)
+      .gt("withdrawal", 0);
+    if (from) q = q.gte("approved_at", from);
+    if (to) q = q.lte("approved_at", to);
+    return q;
+  });
   if (data.length === 0) return [];
 
   const map = new Map<string, { amount: number; count: number }>();
@@ -193,16 +193,16 @@ export async function getCashIncomeCategories(
 ): Promise<CategoryPoint[]> {
   const supabase = await createClient();
 
-  let query = supabase
-    .from("cash_transactions")
-    .select("income_category, deposit")
-    .eq("org_id", orgId)
-    .gt("deposit", 0);
-
-  if (from) query = query.gte("approved_at", from);
-  if (to) query = query.lte("approved_at", to);
-
-  const data = await fetchAll<{ income_category: string; deposit: number }>(query);
+  const data = await fetchAll<{ income_category: string; deposit: number }>(() => {
+    let q = supabase
+      .from("cash_transactions")
+      .select("income_category, deposit")
+      .eq("org_id", orgId)
+      .gt("deposit", 0);
+    if (from) q = q.gte("approved_at", from);
+    if (to) q = q.lte("approved_at", to);
+    return q;
+  });
   if (data.length === 0) return [];
 
   const map = new Map<string, { amount: number; count: number }>();
@@ -226,15 +226,15 @@ export async function getCashSummary(
 ): Promise<CashSummary> {
   const supabase = await createClient();
 
-  let query = supabase
-    .from("cash_transactions")
-    .select("deposit, withdrawal, approved_at")
-    .eq("org_id", orgId);
-
-  if (from) query = query.gte("approved_at", from);
-  if (to) query = query.lte("approved_at", to);
-
-  const data = await fetchAll<{ deposit: number; withdrawal: number; approved_at: string }>(query);
+  const data = await fetchAll<{ deposit: number; withdrawal: number; approved_at: string }>(() => {
+    let q = supabase
+      .from("cash_transactions")
+      .select("deposit, withdrawal, approved_at")
+      .eq("org_id", orgId);
+    if (from) q = q.gte("approved_at", from);
+    if (to) q = q.lte("approved_at", to);
+    return q;
+  });
   if (data.length === 0) return { totalDeposit: 0, totalWithdrawal: 0, netFlow: 0, txCount: 0, dateFrom: "", dateTo: "" };
 
   let totalDeposit = 0;
@@ -294,7 +294,7 @@ export async function getCashTransactions(
 export async function getUploadedFiles(orgId: string) {
   const supabase = await createClient();
 
-  const data = await fetchAll<{ file_name: string; uploaded_at: string; approved_at: string }>(
+  const data = await fetchAll<{ file_name: string; uploaded_at: string; approved_at: string }>(() =>
     supabase
       .from("cash_transactions")
       .select("file_name, uploaded_at, approved_at")
@@ -328,13 +328,14 @@ export async function getOrgsCashSummary(from?: string, to?: string): Promise<Or
   if (!orgs?.length) return [];
 
   // org_id별 집계
-  let query = supabase
-    .from("cash_transactions")
-    .select("org_id, deposit, withdrawal, approved_at");
-  if (from) query = query.gte("approved_at", from);
-  if (to) query = query.lte("approved_at", to);
-
-  const data = await fetchAll<{ org_id: string; deposit: number; withdrawal: number; approved_at: string }>(query);
+  const data = await fetchAll<{ org_id: string; deposit: number; withdrawal: number; approved_at: string }>(() => {
+    let q = supabase
+      .from("cash_transactions")
+      .select("org_id, deposit, withdrawal, approved_at");
+    if (from) q = q.gte("approved_at", from);
+    if (to) q = q.lte("approved_at", to);
+    return q;
+  });
   if (data.length === 0) return [];
 
   const map = new Map<string, { deposit: number; withdrawal: number; count: number; dateFrom: string; dateTo: string }>();
