@@ -288,7 +288,27 @@ export async function getCashTransactions(
   if (category && !type) query = query.or(`expense_category.eq.${category},income_category.eq.${category}`);
 
   const { data, error, count } = await query;
-  return { data: data ?? [], error, totalCount: count ?? 0 };
+
+  // 동일 필터로 합계 조회 (페이징 없이)
+  let sumQuery = supabase
+    .from("cash_transactions")
+    .select("deposit.sum(), withdrawal.sum()")
+    .eq("org_id", orgId);
+
+  if (from) sumQuery = sumQuery.gte("approved_at", from);
+  if (to) sumQuery = sumQuery.lte("approved_at", to);
+  if (type === "income") sumQuery = sumQuery.gt("deposit", 0);
+  if (type === "expense") sumQuery = sumQuery.gt("withdrawal", 0);
+  if (category && type === "expense") sumQuery = sumQuery.eq("expense_category", category);
+  if (category && type === "income") sumQuery = sumQuery.eq("income_category", category);
+  if (category && !type) sumQuery = sumQuery.or(`expense_category.eq.${category},income_category.eq.${category}`);
+
+  const { data: sumData } = await sumQuery.single();
+  const sumRow = sumData as Record<string, number> | null;
+  const totalDeposit = sumRow?.deposit ?? 0;
+  const totalWithdrawal = sumRow?.withdrawal ?? 0;
+
+  return { data: data ?? [], error, totalCount: count ?? 0, totalDeposit, totalWithdrawal };
 }
 
 export async function getUploadedFiles(orgId: string) {

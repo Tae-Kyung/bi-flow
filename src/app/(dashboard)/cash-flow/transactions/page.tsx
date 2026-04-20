@@ -60,7 +60,7 @@ export default async function TransactionsPage({
     orgName = org?.name ?? "";
   }
 
-  const { data: transactions, totalCount } = await getCashTransactions(
+  const { data: transactions, totalCount, totalDeposit, totalWithdrawal } = await getCashTransactions(
     orgId,
     from || undefined,
     to || undefined,
@@ -162,7 +162,10 @@ export default async function TransactionsPage({
           <CardTitle className="text-base">
             거래 내역{" "}
             <span className="font-normal text-muted-foreground">
-              (총 {totalCount.toLocaleString("ko-KR")}건{totalCount > 50 ? ` · ${page + 1}/${Math.ceil(totalCount / 50)} 페이지` : ""})
+              (총 {totalCount.toLocaleString("ko-KR")}건
+              {totalDeposit > 0 && ` · 입금 ${totalDeposit.toLocaleString("ko-KR")}원`}
+              {totalWithdrawal > 0 && ` · 출금 ${totalWithdrawal.toLocaleString("ko-KR")}원`}
+              {totalCount > 50 ? ` · ${page + 1}/${Math.ceil(totalCount / 50)} 페이지` : ""})
             </span>
           </CardTitle>
         </CardHeader>
