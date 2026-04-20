@@ -76,17 +76,28 @@ export async function POST(req: NextRequest) {
     console.log("[cash-upload] new:", newRows.length, "skipped:", skipped);
 
     if (newRows.length > 0) {
-      const CHUNK = 1000;
+      // 청크를 나눈 뒤 병렬 insert (Supabase statement timeout 방지를 위해 300행씩)
+      const CHUNK = 300;
+      const chunks: (typeof newRows)[] = [];
       for (let i = 0; i < newRows.length; i += CHUNK) {
-        const chunk = newRows.slice(i, i + CHUNK).map((r) => ({
-          ...r,
-          org_id: orgId,
-          file_name: file.name,
-        }));
-        const { error: insertErr } = await supabase.from("cash_transactions").insert(chunk);
-        if (insertErr) {
-          console.error("[cash-upload] insert error:", insertErr);
-          return NextResponse.json({ error: `DB 오류: ${insertErr.message}` }, { status: 500 });
+        chunks.push(newRows.slice(i, i + CHUNK));
+      }
+
+      // 3개씩 병렬 처리
+      const PARALLEL = 3;
+      for (let i = 0; i < chunks.length; i += PARALLEL) {
+        const batch = chunks.slice(i, i + PARALLEL);
+        const results = await Promise.all(
+          batch.map((chunk) =>
+            supabase.from("cash_transactions").insert(
+              chunk.map((r) => ({ ...r, org_id: orgId, file_name: file.name }))
+            )
+          )
+        );
+        const failed = results.find((r) => r.error);
+        if (failed?.error) {
+          console.error("[cash-upload] insert error:", failed.error);
+          return NextResponse.json({ error: `DB 오류: ${failed.error.message}` }, { status: 500 });
         }
       }
     }
