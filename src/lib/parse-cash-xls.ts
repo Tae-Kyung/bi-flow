@@ -1,5 +1,6 @@
-// 현금출납부 XLS 파일 파서 (충북대 BI 형식)
-// xlsx 라이브러리로 파싱 후 EUC-KR 문자열을 iconv-lite로 디코딩
+// 현금출납부 XLS/XLSX 파일 파서 (충북대 BI 형식)
+// .xls: EUC-KR 인코딩 → iconv-lite로 디코딩 필요
+// .xlsx: XML 기반 UTF-8 → 디코딩 불필요
 
 import * as XLSX from "xlsx";
 import * as iconv from "iconv-lite";
@@ -11,6 +12,12 @@ function decodeEucKr(s: unknown): string {
   if (typeof s !== "string") return String(s ?? "");
   const bytes = Buffer.from(s, "binary");
   return iconv.decode(bytes, "euc-kr");
+}
+
+// .xlsx 파일은 이미 UTF-8이므로 그대로 반환
+function toStr(s: unknown): string {
+  if (typeof s !== "string") return String(s ?? "");
+  return s;
 }
 
 // Excel 날짜 일련번호 → YYYY-MM-DD
@@ -25,7 +32,7 @@ function excelDateToISO(serial: number): string {
 // 11:발의부서, 12:발의일자, 13:발의번호, 14:예산항목,
 // 15:과제번호, 16:과제책임자, 17:청구유형
 
-export function parseCashXls(buffer: ArrayBuffer): ParsedCashRow[] {
+export function parseCashXls(buffer: ArrayBuffer, fileName?: string): ParsedCashRow[] {
   const wb = XLSX.read(buffer, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json(ws, {
@@ -35,6 +42,10 @@ export function parseCashXls(buffer: ArrayBuffer): ParsedCashRow[] {
   }) as unknown[][];
 
   if (raw.length < 2) return [];
+
+  // .xlsx는 UTF-8이므로 디코딩 불필요, .xls만 EUC-KR 디코딩
+  const ext = fileName?.split(".").pop()?.toLowerCase() ?? "";
+  const decode = ext === "xlsx" ? toStr : decodeEucKr;
 
   const rows: ParsedCashRow[] = [];
 
@@ -55,17 +66,17 @@ export function parseCashXls(buffer: ArrayBuffer): ParsedCashRow[] {
     if (deposit === 0 && withdrawal === 0) continue;
 
     const acctCode = String(cols[3] ?? "");
-    const budgetItem = decodeEucKr(cols[14]);
-    const billingType = decodeEucKr(cols[17]);
-    const desc = decodeEucKr(cols[10]);
+    const budgetItem = decode(cols[14]);
+    const billingType = decode(cols[17]);
+    const desc = decode(cols[10]);
 
     rows.push({
       seq_no: seqNo,
       approved_at,
       approval_no: String(cols[2] ?? ""),
       acct_code: acctCode,
-      acct_name: decodeEucKr(cols[4]),
-      acct_ref: decodeEucKr(cols[5]),
+      acct_name: decode(cols[4]),
+      acct_ref: decode(cols[5]),
       deposit,
       withdrawal,
       balance: typeof cols[9] === "number" ? (cols[9] as number) : 0,

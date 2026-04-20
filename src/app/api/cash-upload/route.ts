@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     const rows =
       ext === "txt"
         ? parseCashTxt(buffer, file.name)
-        : parseCashXls(buffer);
+        : parseCashXls(buffer, file.name);
     console.log("[cash-upload] parsed rows:", rows.length);
 
     if (rows.length === 0) {
