@@ -289,24 +289,25 @@ export async function getCashTransactions(
 
   const { data, error, count } = await query;
 
-  // 동일 필터로 합계 조회 (페이징 없이)
-  let sumQuery = supabase
-    .from("cash_transactions")
-    .select("deposit.sum(), withdrawal.sum()")
-    .eq("org_id", orgId);
+  // 동일 필터로 합계 조회 (페이징 없이, deposit/withdrawal만 가져와서 합산)
+  const allRows = await fetchAll<{ deposit: number; withdrawal: number }>(() => {
+    let q = supabase
+      .from("cash_transactions")
+      .select("deposit, withdrawal")
+      .eq("org_id", orgId);
 
-  if (from) sumQuery = sumQuery.gte("approved_at", from);
-  if (to) sumQuery = sumQuery.lte("approved_at", to);
-  if (type === "income") sumQuery = sumQuery.gt("deposit", 0);
-  if (type === "expense") sumQuery = sumQuery.gt("withdrawal", 0);
-  if (category && type === "expense") sumQuery = sumQuery.eq("expense_category", category);
-  if (category && type === "income") sumQuery = sumQuery.eq("income_category", category);
-  if (category && !type) sumQuery = sumQuery.or(`expense_category.eq.${category},income_category.eq.${category}`);
+    if (from) q = q.gte("approved_at", from);
+    if (to) q = q.lte("approved_at", to);
+    if (type === "income") q = q.gt("deposit", 0);
+    if (type === "expense") q = q.gt("withdrawal", 0);
+    if (category && type === "expense") q = q.eq("expense_category", category);
+    if (category && type === "income") q = q.eq("income_category", category);
+    if (category && !type) q = q.or(`expense_category.eq.${category},income_category.eq.${category}`);
 
-  const { data: sumData } = await sumQuery.single();
-  const sumRow = sumData as Record<string, number> | null;
-  const totalDeposit = sumRow?.deposit ?? 0;
-  const totalWithdrawal = sumRow?.withdrawal ?? 0;
+    return q;
+  });
+  const totalDeposit = allRows.reduce((sum, r) => sum + (r.deposit ?? 0), 0);
+  const totalWithdrawal = allRows.reduce((sum, r) => sum + (r.withdrawal ?? 0), 0);
 
   return { data: data ?? [], error, totalCount: count ?? 0, totalDeposit, totalWithdrawal };
 }
