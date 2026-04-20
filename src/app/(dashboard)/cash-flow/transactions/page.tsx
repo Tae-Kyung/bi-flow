@@ -7,6 +7,7 @@ import Link from "next/link";
 import { getCashTransactions, getCashExpenseCategories, getCashIncomeCategories } from "@/actions/cash-flow";
 import { TransactionDeleteButton } from "@/components/cash-flow/transaction-delete-button";
 import { TransactionFilters } from "@/components/cash-flow/transaction-filters";
+import { DeleteAllCashButton } from "@/components/cash-flow/delete-all-button";
 
 const EXPENSE_BADGE: Record<string, string> = {
   인건비: "destructive",
@@ -89,21 +90,26 @@ export default async function TransactionsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/cash-flow" className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">거래 내역</h1>
-          <p className="text-sm text-muted-foreground">
-            {[
-              orgName,
-              from || to ? `${from || ""}~${to || ""}` : "전체 기간",
-              type === "expense" ? "지출" : type === "income" ? "수입" : "",
-              category,
-            ].filter(Boolean).join(" · ")}
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link href="/cash-flow" className="text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold">거래 내역</h1>
+            <p className="text-sm text-muted-foreground">
+              {[
+                orgName,
+                from || to ? `${from || ""}~${to || ""}` : "전체 기간",
+                type === "expense" ? "지출" : type === "income" ? "수입" : "",
+                category,
+              ].filter(Boolean).join(" · ")}
+            </p>
+          </div>
         </div>
+        {profile.role === "super_admin" && orgId && orgName && (
+          <DeleteAllCashButton orgId={orgId} orgName={orgName} />
+        )}
       </div>
 
       {/* super_admin 기관 선택 */}

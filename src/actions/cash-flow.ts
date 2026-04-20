@@ -382,3 +382,20 @@ export async function deleteCashTransaction(id: string) {
 
   revalidatePath("/cash-flow/transactions");
 }
+
+export async function deleteAllCashByOrg(orgId: string) {
+  const profile = await requireAuth();
+  if (profile.role !== "super_admin") throw new Error("권한 없음");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("cash_transactions")
+    .delete()
+    .eq("org_id", orgId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/cash-flow");
+  revalidatePath("/cash-flow/transactions");
+  revalidatePath("/cash-flow/upload");
+}
