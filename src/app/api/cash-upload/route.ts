@@ -62,47 +62,82 @@ export async function POST(req: NextRequest) {
     }
 
     // 이미 저장된 seq_no 목록 조회 (같은 org + 파일명)
-    const { data: existing } = await supabase
-      .from("cash_transactions")
-      .select("seq_no")
-      .eq("org_id", orgId)
-      .eq("file_name", file.name);
-
-    const existingSeqNos = new Set((existing ?? []).map((r) => r.seq_no));
+    // Supabase 기본 1000행 제한 우회: 페이지네이션으로 전체 조회
+    const existingSeqNos = new Set<number>();
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      const { data: page } = await supabase
+        .from("cash_transactions")
+        .select("seq_no")
+        .eq("org_id", orgId)
+        .eq("file_name", file.name)
+        .range(from, from + PAGE - 1);
+      if (!page || page.length === 0) break;
+      for (const r of page) existingSeqNos.add(r.seq_no);
+      if (page.length < PAGE) break;
+      from += PAGE;
+    }
 
     // 신규 행만 필터링
     const newRows = rows.filter((r) => !existingSeqNos.has(r.seq_no));
     const skipped = rows.length - newRows.length;
-    console.log("[cash-upload] new:", newRows.length, "skipped:", skipped);
+    console.log("[cash-upload] new:", newRows.length, "skipped:", skipped, "existing:", existingSeqNos.size);
 
-    if (newRows.length > 0) {
-      // 청크를 나눈 뒤 병렬 insert (Supabase statement timeout 방지를 위해 300행씩)
-      const CHUNK = 300;
-      const chunks: (typeof newRows)[] = [];
-      for (let i = 0; i < newRows.length; i += CHUNK) {
-        chunks.push(newRows.slice(i, i + CHUNK));
-      }
-
-      // 3개씩 병렬 처리
-      const PARALLEL = 3;
-      for (let i = 0; i < chunks.length; i += PARALLEL) {
-        const batch = chunks.slice(i, i + PARALLEL);
-        const results = await Promise.all(
-          batch.map((chunk) =>
-            supabase.from("cash_transactions").insert(
-              chunk.map((r) => ({ ...r, org_id: orgId, file_name: file.name }))
-            )
-          )
-        );
-        const failed = results.find((r) => r.error);
-        if (failed?.error) {
-          console.error("[cash-upload] insert error:", failed.error);
-          return NextResponse.json({ error: `DB 오류: ${failed.error.message}` }, { status: 500 });
-        }
-      }
+    if (newRows.length === 0) {
+      return NextResponse.json({ count: 0, skipped });
     }
 
-    return NextResponse.json({ count: newRows.length, skipped });
+    // 기존 데이터가 있으면 삭제 후 전체 재삽입 (부분 업로드 방지)
+    if (existingSeqNos.size > 0) {
+      await supabase
+        .from("cash_transactions")
+        .delete()
+        .eq("org_id", orgId)
+        .eq("file_name", file.name);
+      // 전체 행을 다시 삽입
+      const allRows = rows;
+      const CHUNK = 200;
+      for (let i = 0; i < allRows.length; i += CHUNK) {
+        const chunk = allRows.slice(i, i + CHUNK).map((r) => ({
+          ...r,
+          org_id: orgId,
+          file_name: file.name,
+        }));
+        const { error: insertErr } = await supabase.from("cash_transactions").insert(chunk);
+        if (insertErr) {
+          console.error("[cash-upload] insert error at chunk", Math.floor(i / CHUNK), ":", insertErr);
+          return NextResponse.json(
+            { error: `DB 오류 (${i}행째): ${insertErr.message}` },
+            { status: 500 }
+          );
+        }
+      }
+      return NextResponse.json({ count: allRows.length, skipped: 0 });
+    }
+
+    // 신규 업로드: 200행씩 순차 insert
+    const CHUNK = 200;
+    let inserted = 0;
+    for (let i = 0; i < newRows.length; i += CHUNK) {
+      const chunk = newRows.slice(i, i + CHUNK).map((r) => ({
+        ...r,
+        org_id: orgId,
+        file_name: file.name,
+      }));
+      const { error: insertErr } = await supabase.from("cash_transactions").insert(chunk);
+      if (insertErr) {
+        console.error("[cash-upload] insert error at chunk", Math.floor(i / CHUNK), ":", insertErr);
+        return NextResponse.json(
+          { error: `DB 오류 (${inserted}건 삽입 후 실패): ${insertErr.message}`, count: inserted, skipped },
+          { status: 500 }
+        );
+      }
+      inserted += chunk.length;
+      console.log("[cash-upload] inserted:", inserted, "/", newRows.length);
+    }
+
+    return NextResponse.json({ count: inserted, skipped });
   } catch (e: any) {
     console.error("[cash-upload] unexpected:", e);
     return NextResponse.json({ error: e?.message ?? "서버 오류" }, { status: 500 });
