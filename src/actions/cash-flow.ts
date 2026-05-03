@@ -391,6 +391,67 @@ export async function getOrgsCashSummary(from?: string, to?: string): Promise<Or
     .sort((a, b) => b.totalDeposit - a.totalDeposit);
 }
 
+// ── 기관별 월간 스냅샷 (이번달 vs 지난달) ──────────────────
+export interface OrgMonthlySnapshot {
+  orgId: string;
+  orgName: string;
+  thisMonth: { deposit: number; withdrawal: number; net: number; count: number };
+  lastMonth: { deposit: number; withdrawal: number; net: number; count: number };
+}
+
+export async function getOrgsMonthlySnapshot(): Promise<OrgMonthlySnapshot[]> {
+  const supabase = await createClient();
+
+  const { data: orgs } = await supabase.from("organizations").select("id, name").order("name");
+  if (!orgs?.length) return [];
+
+  // 이번달, 지난달 범위 계산
+  const now = new Date();
+  const thisMonthFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthFrom = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, "0")}-01`;
+  const lastMonthTo = new Date(now.getFullYear(), now.getMonth(), 0); // 지난달 마지막일
+  const lastMonthToStr = `${lastMonthTo.getFullYear()}-${String(lastMonthTo.getMonth() + 1).padStart(2, "0")}-${String(lastMonthTo.getDate()).padStart(2, "0")}`;
+
+  // 지난달 + 이번달 데이터를 한번에 가져옴
+  const data = await fetchAll<{ org_id: string; deposit: number; withdrawal: number; approved_at: string }>(() =>
+    supabase
+      .from("cash_transactions")
+      .select("org_id, deposit, withdrawal, approved_at")
+      .gte("approved_at", lastMonthFrom)
+  );
+
+  const map = new Map<string, { thisMonth: { d: number; w: number; c: number }; lastMonth: { d: number; w: number; c: number } }>();
+
+  for (const row of data) {
+    const oid = row.org_id as string;
+    if (!map.has(oid)) map.set(oid, { thisMonth: { d: 0, w: 0, c: 0 }, lastMonth: { d: 0, w: 0, c: 0 } });
+    const entry = map.get(oid)!;
+    const isThisMonth = row.approved_at >= thisMonthFrom;
+    const bucket = isThisMonth ? entry.thisMonth : entry.lastMonth;
+    bucket.d += row.deposit ?? 0;
+    bucket.w += row.withdrawal ?? 0;
+    bucket.c += 1;
+  }
+
+  // 데이터가 없는 기관도 포함 (전체 기관 데이터가 있을 때 비교용)
+  // 하지만 두 달 다 데이터 없는 기관은 제외
+  return orgs
+    .map((o) => {
+      const entry = map.get(o.id);
+      // 전체 기간 데이터 존재 여부 확인 (이번달/지난달 외에도 과거 데이터가 있을 수 있으므로)
+      const tm = entry?.thisMonth ?? { d: 0, w: 0, c: 0 };
+      const lm = entry?.lastMonth ?? { d: 0, w: 0, c: 0 };
+      return {
+        orgId: o.id,
+        orgName: o.name,
+        thisMonth: { deposit: tm.d, withdrawal: tm.w, net: tm.d - tm.w, count: tm.c },
+        lastMonth: { deposit: lm.d, withdrawal: lm.w, net: lm.d - lm.w, count: lm.c },
+      };
+    })
+    .filter((o) => o.thisMonth.count > 0 || o.lastMonth.count > 0);
+}
+
 export async function deleteCashFile(orgId: string, fileName: string) {
   const profile = await requireAuth();
   if (profile.role === "tenant") throw new Error("권한 없음");

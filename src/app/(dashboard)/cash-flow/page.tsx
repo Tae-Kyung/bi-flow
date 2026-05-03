@@ -13,12 +13,117 @@ import {
   getCashExpenseCategories,
   getCashIncomeCategories,
   getCashSummary,
+  getOrgsMonthlySnapshot,
   type Granularity,
+  type OrgMonthlySnapshot,
 } from "@/actions/cash-flow";
 import { CashFlowTimeChart } from "@/components/cash-flow/time-chart";
 import { ExpenseCategoryCharts, IncomeCategoryCharts } from "@/components/cash-flow/category-charts";
 import { GranularityFilter, PeriodFilter } from "@/components/cash-flow/granularity-filter";
 import { OrgSelector } from "@/components/cash-flow/org-selector";
+
+function fmtCompact(n: number) {
+  if (Math.abs(n) >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억`;
+  if (Math.abs(n) >= 10_000) return `${Math.round(n / 10_000).toLocaleString("ko-KR")}만`;
+  return n.toLocaleString("ko-KR");
+}
+
+function changeRate(cur: number, prev: number): string | null {
+  if (prev === 0) return cur > 0 ? "+100%" : null;
+  const pct = ((cur - prev) / prev) * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%`;
+}
+
+function OrgMonthlySummaryCard({ data }: { data: OrgMonthlySnapshot[] }) {
+  const now = new Date();
+  const thisLabel = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const lastDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastLabel = `${lastDate.getFullYear()}.${String(lastDate.getMonth() + 1).padStart(2, "0")}`;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">기관별 월간 현금흐름</CardTitle>
+          <Badge variant="outline" className="text-xs">
+            {lastLabel} vs {thisLabel}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="text-left px-4 py-2.5 font-medium" rowSpan={2}>기관</th>
+                <th className="text-center px-2 py-1.5 font-medium border-b text-muted-foreground" colSpan={3}>{lastLabel}</th>
+                <th className="text-center px-2 py-1.5 font-medium border-b" colSpan={3}>{thisLabel}</th>
+                <th className="text-center px-2 py-1.5 font-medium border-b text-muted-foreground" rowSpan={2}>증감</th>
+              </tr>
+              <tr>
+                <th className="text-right px-2 py-1.5 text-xs font-normal text-blue-600">입금</th>
+                <th className="text-right px-2 py-1.5 text-xs font-normal text-red-500">출금</th>
+                <th className="text-right px-2 py-1.5 text-xs font-normal">순흐름</th>
+                <th className="text-right px-2 py-1.5 text-xs font-normal text-blue-600">입금</th>
+                <th className="text-right px-2 py-1.5 text-xs font-normal text-red-500">출금</th>
+                <th className="text-right px-2 py-1.5 text-xs font-normal">순흐름</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((org, i) => {
+                const chg = changeRate(org.thisMonth.net, org.lastMonth.net);
+                return (
+                  <tr key={org.orgId} className={`border-b ${i % 2 === 0 ? "" : "bg-muted/20"}`}>
+                    <td className="px-4 py-2.5 font-medium whitespace-nowrap">
+                      <Link href={`/cash-flow?org=${org.orgId}`} className="hover:underline text-primary">
+                        {org.orgName}
+                      </Link>
+                    </td>
+                    <td className="px-2 py-2.5 text-right font-mono text-muted-foreground">
+                      {org.lastMonth.count > 0 ? fmtCompact(org.lastMonth.deposit) : "-"}
+                    </td>
+                    <td className="px-2 py-2.5 text-right font-mono text-muted-foreground">
+                      {org.lastMonth.count > 0 ? fmtCompact(org.lastMonth.withdrawal) : "-"}
+                    </td>
+                    <td className="px-2 py-2.5 text-right font-mono text-muted-foreground">
+                      {org.lastMonth.count > 0 ? (
+                        <span className={org.lastMonth.net >= 0 ? "text-emerald-600" : "text-red-500"}>
+                          {org.lastMonth.net >= 0 ? "+" : ""}{fmtCompact(org.lastMonth.net)}
+                        </span>
+                      ) : "-"}
+                    </td>
+                    <td className="px-2 py-2.5 text-right font-mono text-blue-600">
+                      {org.thisMonth.count > 0 ? fmtCompact(org.thisMonth.deposit) : "-"}
+                    </td>
+                    <td className="px-2 py-2.5 text-right font-mono text-red-500">
+                      {org.thisMonth.count > 0 ? fmtCompact(org.thisMonth.withdrawal) : "-"}
+                    </td>
+                    <td className="px-2 py-2.5 text-right font-mono">
+                      {org.thisMonth.count > 0 ? (
+                        <span className={org.thisMonth.net >= 0 ? "text-emerald-600" : "text-red-500"}>
+                          {org.thisMonth.net >= 0 ? "+" : ""}{fmtCompact(org.thisMonth.net)}
+                        </span>
+                      ) : "-"}
+                    </td>
+                    <td className="px-2 py-2.5 text-center text-xs">
+                      {chg ? (
+                        <Badge variant={chg.startsWith("+") ? "default" : "destructive"} className="text-xs px-1.5 py-0">
+                          {chg}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function formatAmount(n: number) {
   if (Math.abs(n) >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억`;
@@ -105,11 +210,12 @@ export default async function CashFlowPage({
   }
 
   // 병렬 데이터 조회
-  const [summary, timeSeries, expenseCats, incomeCats] = await Promise.all([
+  const [summary, timeSeries, expenseCats, incomeCats, monthlySnapshot] = await Promise.all([
     getCashSummary(orgId, from || undefined, to || undefined),
     getCashTimeSeries(orgId, gran, from || undefined, to || undefined),
     getCashExpenseCategories(orgId, from || undefined, to || undefined),
     getCashIncomeCategories(orgId, from || undefined, to || undefined),
+    profile.role === "super_admin" ? getOrgsMonthlySnapshot() : Promise.resolve([] as OrgMonthlySnapshot[]),
   ]);
 
   const kpiCards = [
@@ -199,6 +305,11 @@ export default async function CashFlowPage({
           </Card>
         ))}
       </div>
+
+      {/* 기관별 월간 현금흐름 요약 (super_admin only) */}
+      {profile.role === "super_admin" && monthlySnapshot.length > 0 && (
+        <OrgMonthlySummaryCard data={monthlySnapshot} />
+      )}
 
       {/* 시계열 차트 */}
       <Card>
