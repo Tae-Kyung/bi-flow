@@ -7,6 +7,32 @@ import * as iconv from "iconv-lite";
 import type { ParsedCashRow } from "./parse-cash-txt";
 import { deriveExpenseCategory, deriveIncomeCategory } from "./parse-cash-txt";
 
+// 12-컬럼 형식(G-Center 등)의 col6 "분류" 값을 기존 카테고리 체계에 매핑
+function mapShortExpenseCategory(cat: string): string {
+  switch (cat) {
+    case "인건비": return "인건비";
+    case "센터장수당": return "인건비";
+    case "운영비": return "운영비";
+    case "기업지원비": return "기업지원비";
+    case "자산취득비": return "집기·비품";
+    case "부가세예수금": case "부가세예수금입금액": return "부가세";
+    case "선급법인세": case "선급지방세": return "세금";
+    case "환경개선비(발전기금)": return "환경개선비";
+    default: return cat || "기타";
+  }
+}
+
+function mapShortIncomeCategory(cat: string): string {
+  switch (cat) {
+    case "임대료": return "임대료";
+    case "부가세예수금입금액": case "부가세예수금": case "부가세대급금회수액": return "VAT(부가세)";
+    case "이자수익": return "이자·기타수익";
+    case "기타운영외수익": return "이자·기타수익";
+    case "발전기금": return "전입금·보조금";
+    default: return cat || "기타수입";
+  }
+}
+
 // xlsx가 EUC-KR 바이트를 Latin-1로 읽어온 문자열을 올바른 한글로 변환
 function decodeEucKr(s: unknown): string {
   if (typeof s !== "string") return String(s ?? "");
@@ -47,6 +73,10 @@ export function parseCashXls(buffer: ArrayBuffer, fileName?: string): ParsedCash
   const ext = fileName?.split(".").pop()?.toLowerCase() ?? "";
   const decode = ext === "xlsx" ? toStr : decodeEucKr;
 
+  // 컬럼 수로 형식 판별: 12컬럼(G-Center 등 간소형) vs 18컬럼(충북대 BI 형식)
+  const headerLen = (raw[0] as unknown[]).length;
+  const isShortFormat = headerLen <= 12;
+
   const rows: ParsedCashRow[] = [];
 
   for (let i = 1; i < raw.length; i++) {
@@ -66,27 +96,53 @@ export function parseCashXls(buffer: ArrayBuffer, fileName?: string): ParsedCash
     if (deposit === 0 && withdrawal === 0) continue;
 
     const acctCode = String(cols[3] ?? "");
-    const budgetItem = decode(cols[14]);
-    const billingType = decode(cols[17]);
     const desc = decode(cols[10]);
 
-    rows.push({
-      seq_no: seqNo,
-      approved_at,
-      approval_no: String(cols[2] ?? ""),
-      acct_code: acctCode,
-      acct_name: decode(cols[4]),
-      acct_ref: decode(cols[5]),
-      deposit,
-      withdrawal,
-      balance: typeof cols[9] === "number" ? (cols[9] as number) : 0,
-      description: desc,
-      budget_item: budgetItem,
-      billing_type: billingType,
-      expense_category:
-        withdrawal > 0 ? deriveExpenseCategory(budgetItem, billingType, desc) : "",
-      income_category: deposit > 0 ? deriveIncomeCategory(acctCode, desc) : "",
-    });
+    if (isShortFormat) {
+      // 12-컬럼 형식: col6 = 분류 (카테고리가 이미 지정됨)
+      const category = decode(cols[6]);
+
+      rows.push({
+        seq_no: seqNo,
+        approved_at,
+        approval_no: String(cols[2] ?? ""),
+        acct_code: acctCode,
+        acct_name: decode(cols[4]),
+        acct_ref: decode(cols[5]),
+        deposit,
+        withdrawal,
+        balance: typeof cols[9] === "number" ? (cols[9] as number) : 0,
+        description: desc,
+        budget_item: category,
+        billing_type: "",
+        expense_category:
+          withdrawal > 0 ? mapShortExpenseCategory(category) : "",
+        income_category:
+          deposit > 0 ? mapShortIncomeCategory(category) : "",
+      });
+    } else {
+      // 18-컬럼 형식: 기존 충북대 BI 형식
+      const budgetItem = decode(cols[14]);
+      const billingType = decode(cols[17]);
+
+      rows.push({
+        seq_no: seqNo,
+        approved_at,
+        approval_no: String(cols[2] ?? ""),
+        acct_code: acctCode,
+        acct_name: decode(cols[4]),
+        acct_ref: decode(cols[5]),
+        deposit,
+        withdrawal,
+        balance: typeof cols[9] === "number" ? (cols[9] as number) : 0,
+        description: desc,
+        budget_item: budgetItem,
+        billing_type: billingType,
+        expense_category:
+          withdrawal > 0 ? deriveExpenseCategory(budgetItem, billingType, desc) : "",
+        income_category: deposit > 0 ? deriveIncomeCategory(acctCode, desc) : "",
+      });
+    }
   }
 
   return rows;
