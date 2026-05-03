@@ -165,7 +165,8 @@ export async function getCashExpenseCategories(
       .from("cash_transactions")
       .select("expense_category, withdrawal")
       .eq("org_id", orgId)
-      .gt("withdrawal", 0);
+      .gt("withdrawal", 0)
+      .order("id");
     if (from) q = q.gte("approved_at", from);
     if (to) q = q.lte("approved_at", to);
     return q;
@@ -198,7 +199,8 @@ export async function getCashIncomeCategories(
       .from("cash_transactions")
       .select("income_category, deposit")
       .eq("org_id", orgId)
-      .gt("deposit", 0);
+      .gt("deposit", 0)
+      .order("id");
     if (from) q = q.gte("approved_at", from);
     if (to) q = q.lte("approved_at", to);
     return q;
@@ -230,7 +232,8 @@ export async function getCashSummary(
     let q = supabase
       .from("cash_transactions")
       .select("deposit, withdrawal, approved_at")
-      .eq("org_id", orgId);
+      .eq("org_id", orgId)
+      .order("id");
     if (from) q = q.gte("approved_at", from);
     if (to) q = q.lte("approved_at", to);
     return q;
@@ -294,7 +297,8 @@ export async function getCashTransactions(
     let q = supabase
       .from("cash_transactions")
       .select("deposit, withdrawal")
-      .eq("org_id", orgId);
+      .eq("org_id", orgId)
+      .order("id");
 
     if (from) q = q.gte("approved_at", from);
     if (to) q = q.lte("approved_at", to);
@@ -352,7 +356,8 @@ export async function getOrgsCashSummary(from?: string, to?: string): Promise<Or
   const data = await fetchAll<{ org_id: string; deposit: number; withdrawal: number; approved_at: string }>(() => {
     let q = supabase
       .from("cash_transactions")
-      .select("org_id, deposit, withdrawal, approved_at");
+      .select("org_id, deposit, withdrawal, approved_at")
+      .order("id");
     if (from) q = q.gte("approved_at", from);
     if (to) q = q.lte("approved_at", to);
     return q;
@@ -419,6 +424,7 @@ export async function getOrgsMonthlySnapshot(): Promise<OrgMonthlySnapshot[]> {
       .from("cash_transactions")
       .select("org_id, deposit, withdrawal, approved_at")
       .gte("approved_at", lastMonthFrom)
+      .order("id")
   );
 
   const map = new Map<string, { thisMonth: { d: number; w: number; c: number }; lastMonth: { d: number; w: number; c: number } }>();
